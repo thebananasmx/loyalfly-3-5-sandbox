@@ -1,4 +1,6 @@
-import { initializeApp } from "firebase/app";
+
+// FIX: Using @firebase scope for imports to ensure modular SDK type definitions are correctly resolved
+import { initializeApp } from "@firebase/app";
 import {
   getAuth,
   signInWithEmailAndPassword,
@@ -9,7 +11,7 @@ import {
   EmailAuthProvider,
   reauthenticateWithCredential,
   updatePassword
-} from "firebase/auth";
+} from "@firebase/auth";
 import {
   getFirestore,
   doc,
@@ -27,7 +29,7 @@ import {
   orderBy,
   limit,
   startAfter,
-} from "firebase/firestore";
+} from "@firebase/firestore";
 import type { Customer, Business, BlogPost } from '../types';
 
 const firebaseConfig = {
