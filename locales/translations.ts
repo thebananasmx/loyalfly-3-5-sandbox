@@ -156,7 +156,8 @@ export const es = {
     sampleStamps: "Sellos de Muestra",
     shareText: "Tus clientes pueden usar el siguiente enlace para unirse.",
     generateQr: "Genera QR",
-    copied: "¡URL copiada!"
+    copied: "¡URL copiada!",
+    addToWallet: "Añadir a Google Wallet"
   },
   cardEditor: {
     saveSuccess: "¡Cambios guardados con éxito!",
@@ -402,7 +403,8 @@ export const en = {
     sampleStamps: "Sample Stamps",
     shareText: "Your customers can use the following link to join.",
     generateQr: "Generate QR",
-    copied: "URL copied!"
+    copied: "URL copied!",
+    addToWallet: "Add to Google Wallet"
   },
   cardEditor: {
     saveSuccess: "Changes saved successfully!",
@@ -522,7 +524,7 @@ export const pt = {
   footer: {
     rights: "Todos os direitos reservados.",
     terms: "Termos de Serviço",
-    pricing: "Preços",
+    pricing: "Precios",
     blog: "Blog",
     docs: "Docs"
   },
@@ -550,7 +552,7 @@ export const pt = {
   landing: {
     hero: {
       title: "Transforme visitantes em clientes fiéis.",
-      subtitle: "Loyalfly é a maneira mais simples e elegante de criar um programa de fidelidade digital que seus clientes vão adorar. Sem cartões de papel, sem complicações.",
+      subtitle: "Loyalfly é a maneira mais simples e elegante de criar un programa de fidelidade digital que seus clientes vão adorar. Sem cartões de papel, sem complicações.",
       viewPlans: "Ver Planos",
       login: "Entrar"
     },
@@ -581,12 +583,12 @@ export const pt = {
       }
     },
     industries: {
-      title: "Perfeito para o seu Negócio",
+      title: "Perfecto para o seu Negócio",
       subtitle: "De cafeterias a salões de beleza, o Loyalfly se adapta a você.",
       slides: {
         cafe: { industry: "Cafeterias", title: "Aroma de lealdade em cada xícara.", desc: "Recompense seus clientes frequentes com um café grátis e faça cada visita valer a pena. Loyalfly é o ingrediente secreto para fazê-los voltar para mais." },
         restaurant: { industry: "Restaurantes", title: "A fidelidade é o prato principal.", desc: "De sobremesas de cortesia a descontos especiais, crie um programa de recompensas que deixe seus clientes com um ótimo gosto na boca." },
-        entrepreneur: { industry: "Empreendedores", title: "Construa uma comunidade, não apenas clientes.", desc: "Se você tem uma loja local ou um pequeno negócio, o Loyalfly ajuda a criar conexões duradouras e transformar compradores ocasionais em seus fãs número um." },
+        entrepreneur: { industry: "Empreendedores", title: "Construa uma comunidade, não apenas clientes.", desc: "Se você tem uma loja local o um pequeno negócio, o Loyalfly ajuda a criar conexões duradouras e transformar compradores ocasionais em seus fãs número um." },
         makeup: { industry: "Nail & Makeup Artists", title: "Beleza que recompensa.", desc: "Ofereça um serviço gratuito ou desconto exclusivo após várias visitas. É a maneira perfeita de agradecer suas clientes por sua confiança e lealdade." },
         barber: { industry: "Estilistas e Barbeiros", title: "Um corte acima da concorrência.", desc: "Fidelize sua clientela com um programa de fidelidade tão impecável quanto seus cortes. Um serviço gratuito a cada poucos cortes é um incentivo que funciona." }
       }
@@ -648,7 +650,8 @@ export const pt = {
     sampleStamps: "Selos de Exemplo",
     shareText: "Seus clientes podem usar o seguinte link para participar.",
     generateQr: "Gerar QR",
-    copied: "URL copiada!"
+    copied: "URL copiada!",
+    addToWallet: "Adicionar ao Google Wallet"
   },
   cardEditor: {
     saveSuccess: "Alterações salvas com sucesso!",
@@ -688,8 +691,8 @@ export const pt = {
     totalResponses: "Total de respostas",
     emptyResponses: "Ainda não há respostas para esta pesquisa. Se você acabou de criá-la, as respostas aparecerão aqui conforme os clientes votarem.",
     saveSuccess: "Configuração da pesquisa salva.",
-    saveError: "Não foi possível salvar a configuração.",
-    requiredError: "A pergunta e ambas as opções são obrigatórias."
+    saveError: "Não foi posible salvar a configuração.",
+    requiredError: "A pregunta e ambas as opções são obrigatórias."
   },
   publicView: {
     lookupTitle: "Consulte seu cartão",
@@ -722,8 +725,8 @@ export const pt = {
       customers1000: "Até 1000 clientes",
       customersUnlimited: "Clientes ilimitados",
       digitalCard: "Cartão de fidelidade digital",
-      basicCustom: "Personalização básica",
-      fullCustom: "Personalização completa",
+      basicCustom: "Personalización básica",
+      fullCustom: "Personalización completa",
       removeBranding: "Remover botão 'Junte-se ao Loyalfly'",
       emailSupport: "Suporte por email",
       prioritySupport: "Suporte prioritário"

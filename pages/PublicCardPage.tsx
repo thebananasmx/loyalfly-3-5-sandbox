@@ -44,7 +44,7 @@ const validateMexicanPhoneNumber = (phone: string): string => {
 };
 
 const PublicCardPage: React.FC = () => {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const { slug } = useParams<{ slug: string }>();
     const topRef = useRef<HTMLDivElement>(null);
 
@@ -66,6 +66,10 @@ const PublicCardPage: React.FC = () => {
     const [userName, setUserName] = useState('');
     const [userPhone, setUserPhone] = useState('');
     const [userEmail, setUserEmail] = useState('');
+
+    // Google Wallet Cloud Function Base URL
+    // TODO: Update this URL with your actual deployed Firebase Cloud Function URL
+    const WALLET_FUNCTION_URL = "https://us-central1-loyalflyapp-3-5-sandbox.cloudfunctions.net/generateWalletPass";
 
     useEffect(() => {
         document.title = 'Loyalfly';
@@ -193,6 +197,12 @@ const PublicCardPage: React.FC = () => {
         } finally {
             setIsSubmitting(false);
         }
+    };
+
+    const handleAddToWallet = () => {
+        if (!businessId || !customer) return;
+        // Redirect to the Cloud Function bridge
+        window.location.href = `${WALLET_FUNCTION_URL}?bid=${businessId}&cid=${customer.id}`;
     };
     
     const renderContent = () => {
@@ -367,6 +377,9 @@ const PublicCardPage: React.FC = () => {
                 );
             
             case 'display':
+                const langCode = i18n.language.split('-')[0];
+                const walletBadgeUrl = `https://raw.githubusercontent.com/thebananasmx/loyalfly-3-5/refs/heads/main/assets/google_wallet_badge_${langCode}.svg`;
+
                 return (
                      <div className="animate-fade-in-up">
                         {surveySettings && surveySettings.isEnabled && !hasVoted && (
@@ -387,6 +400,22 @@ const PublicCardPage: React.FC = () => {
                           customerPhone={customer?.phone}
                           customerId={customer?.id}
                         />
+
+                        {/* Google Wallet Integration Button */}
+                        <div className="mt-6 flex flex-col items-center">
+                            <button 
+                                onClick={handleAddToWallet}
+                                className="transition-transform hover:scale-105 focus:outline-none"
+                                aria-label={t('card.addToWallet')}
+                            >
+                                <img 
+                                    src={`https://developers.google.com/static/wallet/images/add-to-google-wallet-button.svg`} 
+                                    alt={t('card.addToWallet')}
+                                    className="h-12 w-auto"
+                                />
+                            </button>
+                        </div>
+
                         <button
                            onClick={() => {
                                setView('lookup');
