@@ -68,7 +68,6 @@ const PublicCardPage: React.FC = () => {
     const [userEmail, setUserEmail] = useState('');
 
     // Google Wallet Cloud Function Base URL
-    // TODO: Update this URL with your actual deployed Firebase Cloud Function URL
     const WALLET_FUNCTION_URL = "https://us-central1-loyalflyapp-3-5-sandbox.cloudfunctions.net/generateWalletPass";
 
     useEffect(() => {
@@ -105,7 +104,6 @@ const PublicCardPage: React.FC = () => {
         fetchSettings();
     }, [slug]);
 
-    // Scroll to top when the card is displayed using a more robust method
     useEffect(() => {
         if (view === 'display') {
             topRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -139,11 +137,11 @@ const PublicCardPage: React.FC = () => {
                     const voted = await hasCustomerVoted(businessId, foundCustomer.id, surveyData.surveyId);
                     setHasVoted(voted);
                 } else {
-                    setHasVoted(true); // No active survey, so treat as "voted"
+                    setHasVoted(true); 
                 }
                 setView('display');
             } else {
-                setUserPhone(phoneLookup); // Pre-fill phone for registration
+                setUserPhone(phoneLookup); 
                 setView('register');
             }
         } catch (err) {
@@ -188,7 +186,7 @@ const PublicCardPage: React.FC = () => {
             const surveyData = await getSurveySettings(businessId);
             if (surveyData && surveyData.isEnabled) {
                 setSurveySettings(surveyData as SurveySettings);
-                setHasVoted(false); // New customer, hasn't voted
+                setHasVoted(false); 
             }
             setView('display');
         } catch (err) {
@@ -201,12 +199,19 @@ const PublicCardPage: React.FC = () => {
 
     const handleAddToWallet = () => {
         if (!businessId || !customer) return;
-        // Redirect to the Cloud Function bridge
         window.location.href = `${WALLET_FUNCTION_URL}?bid=${businessId}&cid=${customer.id}`;
+    };
+
+    // Helper to get the correct localized badge from Google's static servers
+    const getWalletBadgeUrl = () => {
+        const lang = i18n.language.split('-')[0];
+        const badgeLang = lang === 'es' ? 'es_ES' : lang === 'pt' ? 'pt_BR' : 'en_US';
+        // Using officially recommended static PNGs for maximum compatibility
+        return `https://developers.google.com/static/wallet/images/badges/${badgeLang}_add_to_google_wallet_wallet-badge.png`;
     };
     
     const renderContent = () => {
-        if (errors.form && !settings) { // Show fatal error if settings couldn't load
+        if (errors.form && !settings) { 
             return (
                 <div className="text-center">
                     <h1 className="text-2xl font-bold text-red-600">{t('common.error')}</h1>
@@ -250,7 +255,6 @@ const PublicCardPage: React.FC = () => {
                                                 className={`block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none ${errors.phoneLookup ? 'pr-10 border-red-500 text-red-900 placeholder-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 placeholder-gray-400 focus:ring-black focus:border-black'}`}
                                                 placeholder={t('publicView.lookupSubtitle')}
                                                 aria-invalid={!!errors.phoneLookup}
-                                                aria-describedby="phoneLookup-error"
                                             />
                                             {errors.phoneLookup && (
                                                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
@@ -258,7 +262,7 @@ const PublicCardPage: React.FC = () => {
                                                 </div>
                                             )}
                                         </div>
-                                        <ErrorMessage message={errors.phoneLookup} id="phoneLookup-error" />
+                                        <ErrorMessage message={errors.phoneLookup} />
                                     </div>
                                     <ErrorMessage message={errors.form} />
                                     <button
@@ -300,7 +304,6 @@ const PublicCardPage: React.FC = () => {
                                                 className={`block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none ${errors.userName ? 'pr-10 border-red-500 text-red-900 placeholder-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 placeholder-gray-400 focus:ring-black focus:border-black'}`}
                                                 placeholder={t('common.name')}
                                                 aria-invalid={!!errors.userName}
-                                                aria-describedby="userName-error"
                                             />
                                             {errors.userName && (
                                                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
@@ -308,7 +311,7 @@ const PublicCardPage: React.FC = () => {
                                                 </div>
                                             )}
                                         </div>
-                                        <ErrorMessage message={errors.userName} id="userName-error" />
+                                        <ErrorMessage message={errors.userName} />
                                     </div>
                                     <div>
                                         <label htmlFor="userPhone" className="block text-base font-medium text-gray-700 sr-only">{t('common.phone')}</label>
@@ -323,7 +326,6 @@ const PublicCardPage: React.FC = () => {
                                                 className={`block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none ${errors.userPhone ? 'pr-10 border-red-500 text-red-900 placeholder-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 placeholder-gray-400 focus:ring-black focus:border-black'}`}
                                                 placeholder={t('common.phone')}
                                                 aria-invalid={!!errors.userPhone}
-                                                aria-describedby="userPhone-error"
                                             />
                                             {errors.userPhone && (
                                                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
@@ -331,7 +333,7 @@ const PublicCardPage: React.FC = () => {
                                                 </div>
                                             )}
                                         </div>
-                                        <ErrorMessage message={errors.userPhone} id="userPhone-error" />
+                                        <ErrorMessage message={errors.userPhone} />
                                     </div>
                                     <div>
                                         <label htmlFor="userEmail" className="block text-base font-medium text-gray-700 sr-only">
@@ -346,7 +348,6 @@ const PublicCardPage: React.FC = () => {
                                                 className={`block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none ${errors.userEmail ? 'pr-10 border-red-500 text-red-900 placeholder-red-300 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 placeholder-gray-400 focus:ring-black focus:border-black'}`}
                                                 placeholder={`${t('common.email')} (opcional)`}
                                                 aria-invalid={!!errors.userEmail}
-                                                aria-describedby="userEmail-error"
                                             />
                                             {errors.userEmail && (
                                                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
@@ -354,7 +355,7 @@ const PublicCardPage: React.FC = () => {
                                                 </div>
                                             )}
                                         </div>
-                                        <ErrorMessage message={errors.userEmail} id="userEmail-error" />
+                                        <ErrorMessage message={errors.userEmail} />
                                     </div>
                                     <ErrorMessage message={errors.form} />
                                     <button
@@ -377,9 +378,6 @@ const PublicCardPage: React.FC = () => {
                 );
             
             case 'display':
-                const langCode = i18n.language.split('-')[0];
-                const walletBadgeUrl = `https://raw.githubusercontent.com/thebananasmx/loyalfly-3-5/refs/heads/main/assets/google_wallet_badge_${langCode}.svg`;
-
                 return (
                      <div className="animate-fade-in-up">
                         {surveySettings && surveySettings.isEnabled && !hasVoted && (
@@ -409,9 +407,13 @@ const PublicCardPage: React.FC = () => {
                                 aria-label={t('card.addToWallet')}
                             >
                                 <img 
-                                    src={`https://developers.google.com/static/wallet/images/add-to-google-wallet-button.svg`} 
+                                    src={getWalletBadgeUrl()} 
                                     alt={t('card.addToWallet')}
-                                    className="h-12 w-auto"
+                                    className="h-[48px] w-auto shadow-sm rounded-lg"
+                                    onError={(e) => {
+                                        // Fallback if PNG fails
+                                        (e.target as HTMLImageElement).src = 'https://developers.google.com/static/wallet/images/badges/en_US_add_to_google_wallet_wallet-badge.png';
+                                    }}
                                 />
                             </button>
                         </div>
