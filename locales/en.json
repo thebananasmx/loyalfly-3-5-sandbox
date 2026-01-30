@@ -1,0 +1,209 @@
+{
+  "common": {
+    "loading": "Loading..."
+  },
+  "header": {
+    "pricing": "Pricing",
+    "blog": "Blog",
+    "terms": "Terms",
+    "login": "Log In",
+    "register": "Get Started",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu"
+  },
+  "sidebar": {
+    "dashboard": "Dashboard",
+    "myCard": "My Card",
+    "metrics": "Metrics",
+    "survey": "Survey",
+    "settings": "Settings",
+    "logout": "Log Out"
+  },
+  "landing": {
+    "hero": {
+      "title": "Turn visitors into loyal customers.",
+      "subtitle": "Loyalfly is the simplest and most elegant way to create a digital loyalty program your customers will love. No paper cards, no hassle.",
+      "viewPlans": "View Plans",
+      "login": "Log In"
+    },
+    "stats": {
+      "title": "Our community keeps growing thanks to everyone",
+      "businesses": "Businesses Trust Us",
+      "stamps": "Loyalty Moments (Stamps)",
+      "rewards": "Rewards Delivered"
+    },
+    "designs": {
+      "title": "Designs your customers will love",
+      "subtitle": "Choose a style that represents your brand and customize it to your liking in seconds.",
+      "tabs": {
+        "entrepreneur": { "title": "Entrepreneurs", "desc": "A versatile and modern card, perfect for any type of business starting to build a loyal customer base." },
+        "cafe": { "title": "Coffee Shops", "desc": "A warm and inviting design that encourages your customers to come back for their next cup of coffee or favorite dish." },
+        "barber": { "title": "Barbershops", "desc": "Style and sophistication in a card that reflects the quality of your cuts and services. Ideal for salons and barbershops." },
+        "beauty": { "title": "Beauty", "desc": "A touch of elegance and glamour to reward your clients' loyalty and make them feel special on every visit." }
+      }
+    },
+    "features": {
+      "title": "Everything you need to grow",
+      "subtitle": "Simple for you, magical for your customers.",
+      "list": {
+        "digital": { "title": "100% Digital", "desc": "Your customers only need their phone number. Forget about physical cards forever." },
+        "custom": { "title": "Easy to Customize", "desc": "Adapt your loyalty card design with your brand, colors, and rewards in seconds." },
+        "analytics": { "title": "Simple Analytics", "desc": "Visualize who your most loyal customers are and understand their purchasing behavior." },
+        "results": { "title": "Real Results", "desc": "Increase visit frequency and average spend of your most valuable customers." }
+      }
+    },
+    "industries": {
+      "title": "Perfect for your Business",
+      "subtitle": "From coffee shops to beauty salons, Loyalfly adapts to you.",
+      "slides": {
+        "cafe": { "industry": "Coffee Shops", "title": "Aroma of loyalty in every cup.", "desc": "Reward your frequent customers with a free coffee and make every visit count. Loyalfly is the secret ingredient to keep them coming back for more." },
+        "restaurant": { "industry": "Restaurants", "title": "Loyalty is the main course.", "desc": "From complimentary desserts to special discounts, create a rewards program that leaves your diners with a great taste in their mouths." },
+        "entrepreneur": { "industry": "Entrepreneurs", "title": "Build a community, not just customers.", "desc": "If you have a local store or small business, Loyalfly helps you create lasting connections and turn occasional buyers into your number one fans." },
+        "makeup": { "industry": "Nail & Makeup Artists", "title": "Beauty that rewards.", "desc": "Offer a free service or exclusive discount after several visits. It's the perfect way to thank your clients for their trust and loyalty." },
+        "barber": { "industry": "Stylists & Barbers", "title": "A cut above the competition.", "desc": "Retain your clientele with a loyalty program as impeccable as your cuts. A free service every few cuts is an incentive that works." }
+      }
+    }
+  },
+  "auth": {
+    "loginTitle": "Welcome back",
+    "loginSubtitle": "Log in to your business account.",
+    "registerTitle": "Create your account",
+    "registerSubtitle": "Start building customer loyalty today.",
+    "businessName": "Business Name",
+    "password": "Password",
+    "confirmPassword": "Confirm Password",
+    "forgotPassword": "Forgot your password?",
+    "noAccount": "Don't have an account?",
+    "haveAccount": "Already have an account?",
+    "resetTitle": "Reset Password",
+    "resetSubtitle": "Enter your email to receive a link.",
+    "sendLink": "Send link",
+    "backToLogin": "Back to Log In",
+    "createAccount": "Create Account",
+    "creating": "Creating account..."
+  },
+  "dashboard": {
+    "title": "Customer Dashboard",
+    "scanQr": "Scan QR",
+    "newCustomer": "New Customer",
+    "bulkUpload": "Bulk Upload",
+    "downloadCsv": "Download CSV",
+    "searchPlaceholder": "Search by name, phone or email",
+    "table": {
+      "stamps": "Stamps",
+      "rewards": "Rewards",
+      "joined": "Joined Date"
+    },
+    "actions": {
+      "redeem": "Redeem",
+      "stamp": "Stamp"
+    },
+    "empty": "No customers found."
+  },
+  "card": {
+    "previewTitle": "Preview",
+    "stampsForReward": "Stamps for your reward",
+    "congrats": "Congratulations! You have:",
+    "nextReward": "Your next Reward:",
+    "join": "Join Loyalfly as",
+    "viewRegistration": "View Registration",
+    "copyUrl": "Copy URL",
+    "shareTitle": "Share with your customers",
+    "editorTitle": "Card Editor",
+    "businessNameLabel": "Business Name",
+    "logoUrlLabel": "Logo URL (Optional)",
+    "rewardTextLabel": "Reward Text",
+    "cardColorLabel": "Background Color",
+    "textColorLabel": "Text Color Scheme",
+    "dark": "Dark",
+    "light": "Light",
+    "sampleStamps": "Sample Stamps",
+    "shareText": "Your customers can use the following link to join.",
+    "generateQr": "Generate QR",
+    "copied": "URL copied!"
+  },
+  "cardEditor": {
+    "saveSuccess": "Changes saved successfully!",
+    "saveError": "Could not save changes.",
+    "loadError": "Error loading card data."
+  },
+  "metrics": {
+    "title": "Loyalty Metrics",
+    "subtitle": "A summary of your loyalty program performance.",
+    "totalCustomers": "Total Customers",
+    "totalCustomersDesc": "Active members in your program.",
+    "stampsGiven": "Stamps Given",
+    "stampsGivenDesc": "Total stamps given to customers.",
+    "rewardsRedeemed": "Rewards Redeemed",
+    "rewardsRedeemedDesc": "Customers who completed their card.",
+    "redemptionRate": "Redemption Rate",
+    "redemptionRateDesc": "Percentage of rewards earned that are redeemed.",
+    "chartTitle": "New Customers by Month",
+    "newCustomers": "New Customers",
+    "topCustomersTitle": "Most Loyal Customers",
+    "emptyTopCustomers": "Not enough customer data."
+  },
+  "survey": {
+    "title": "Manage Survey",
+    "subtitle": "Configure the survey your customers will see and review the results.",
+    "configTitle": "Configuration",
+    "active": "Active",
+    "inactive": "Inactive",
+    "bannerLabel": "Banner Message",
+    "questionLabel": "Question",
+    "questionPlaceholder": "Ex: How was the service?",
+    "option1Label": "Option 1",
+    "option1Placeholder": "Ex: Excellent",
+    "option2Label": "Option 2",
+    "option2Placeholder": "Ex: Needs improvement",
+    "resultsTitle": "Current Survey Results",
+    "totalResponses": "Total responses",
+    "emptyResponses": "No responses yet for this survey. If you just created it, responses will appear here as customers vote.",
+    "saveSuccess": "Survey configuration saved.",
+    "saveError": "Could not save configuration.",
+    "requiredError": "The question and both options are required."
+  },
+  "publicView": {
+    "lookupTitle": "Check your card",
+    "lookupSubtitle": "Your phone number (10 digits)",
+    "lookupBtn": "Check",
+    "registerTitle": "Sign Up",
+    "registerBtn": "Register",
+    "newHere": "New here?",
+    "registerLink": "Sign up here",
+    "checkPoints": "Check your stamps",
+    "consultOther": "Check another number"
+  },
+  "pricing": {
+    "title": "Simple and transparent plans",
+    "subtitle": "Choose the plan that fits your business size.",
+    "free": {
+      "name": "Free",
+      "desc": "To start and try."
+    },
+    "entrepreneur": {
+      "name": "Entrepreneur",
+      "desc": "Ideal for growing businesses."
+    },
+    "pro": {
+      "name": "Pro",
+      "desc": "For established businesses."
+    },
+    "features": {
+      "customers100": "Up to 100 customers",
+      "customers1000": "Up to 1000 customers",
+      "customersUnlimited": "Unlimited customers",
+      "digitalCard": "Digital loyalty card",
+      "basicCustom": "Basic customization",
+      "fullCustom": "Full customization",
+      "removeBranding": "Remove 'Join Loyalfly' button",
+      "emailSupport": "Email support",
+      "prioritySupport": "Priority support"
+    },
+    "cta": {
+      "start": "Start",
+      "subscribe": "Subscribe",
+      "contact": "Contact Us"
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "short_name": "Loyalfly",
+  "name": "Loyalfly - Programa de Lealtad Digital",
+  "icons": [
+    {
+      "src": "https://res.cloudinary.com/dg4wbuppq/image/upload/v1767634073/icon-192_mxoqbg.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://res.cloudinary.com/dg4wbuppq/image/upload/v1767634073/icon-512_vwbe6a.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#FFFFFF",
+  "display": "standalone",
+  "scope": "/",
+  "theme_color": "#5134F9",
+  "description": "Fideliza a tus clientes con tarjetas de lealtad digitales modernas y simples."
+}

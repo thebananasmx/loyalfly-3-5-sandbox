@@ -1,0 +1,209 @@
+{
+  "common": {
+    "loading": "Cargando..."
+  },
+  "header": {
+    "pricing": "Precios",
+    "blog": "Blog",
+    "terms": "Términos",
+    "login": "Iniciar Sesión",
+    "register": "Registrarse",
+    "openMenu": "Abrir menú",
+    "closeMenu": "Cerrar menú"
+  },
+  "sidebar": {
+    "dashboard": "Dashboard",
+    "myCard": "Mi Tarjeta",
+    "metrics": "Métricas",
+    "survey": "Encuesta",
+    "settings": "Ajustes",
+    "logout": "Cerrar Sesión"
+  },
+  "landing": {
+    "hero": {
+      "title": "Transforma visitantes en clientes fieles.",
+      "subtitle": "Loyalfly es la forma más simple y elegante de crear un programa de lealtad digital que tus clientes amarán. Sin tarjetas de cartón, sin complicaciones.",
+      "viewPlans": "Ver Planes",
+      "login": "Iniciar Sesión"
+    },
+    "stats": {
+      "title": "Nuestra comunidad sigue creciendo gracias a todos",
+      "businesses": "Negocios Confían en Nosotros",
+      "stamps": "Momentos de Lealtad (Sellos)",
+      "rewards": "Recompensas Entregadas"
+    },
+    "designs": {
+      "title": "Diseños que enamoran a tus clientes",
+      "subtitle": "Elige un estilo que represente tu marca y personalízalo a tu gusto en segundos.",
+      "tabs": {
+        "entrepreneur": { "title": "Emprendedores", "desc": "Una tarjeta versátil y moderna, perfecta para cualquier tipo de negocio que está comenzando a construir una base de clientes leales." },
+        "cafe": { "title": "Cafeterías", "desc": "Un diseño cálido y acogedor que invita a tus clientes a volver por su próxima taza de café o su platillo favorito." },
+        "barber": { "title": "Barberías", "desc": "Estilo y sofisticación en una tarjeta que refleja la calidad de tus cortes y servicios. Ideal para salones y barberías." },
+        "beauty": { "title": "Belleza", "desc": "Un toque de elegancia y glamour para recompensar la fidelidad de tus clientas y hacer que se sientan especiales en cada visita." }
+      }
+    },
+    "features": {
+      "title": "Todo lo que necesitas para crecer",
+      "subtitle": "Simple para ti, mágico para tus clientes.",
+      "list": {
+        "digital": { "title": "100% Digital", "desc": "Tus clientes solo necesitan su número de teléfono. Olvídate de las tarjetas físicas para siempre." },
+        "custom": { "title": "Fácil de Personalizar", "desc": "Adapta el diseño de tu tarjeta de lealtad con tu marca, colores y recompensas en segundos." },
+        "analytics": { "title": "Análisis Sencillos", "desc": "Visualiza quiénes son tus clientes más leales y entiende su comportamiento de compra." },
+        "results": { "title": "Resultados Reales", "desc": "Incrementa la frecuencia de visita y el gasto promedio de tus clientes más valiosos." }
+      }
+    },
+    "industries": {
+      "title": "Perfecto para tu Negocio",
+      "subtitle": "Desde cafeterías hasta salones de belleza, Loyalfly se adapta a ti.",
+      "slides": {
+        "cafe": { "industry": "Cafeterías", "title": "Aroma a lealtad en cada taza.", "desc": "Premia a tus clientes frecuentes con un café gratis y haz que cada visita cuente. Loyalfly es el ingrediente secreto para que vuelvan por más." },
+        "restaurant": { "industry": "Restaurantes", "title": "El platillo principal es la fidelidad.", "desc": "Desde postres de cortesía hasta descuentos especiales, crea un programa de recompensas que deje a tus comensales con un excelente sabor de boca." },
+        "entrepreneur": { "industry": "Emprendedores", "title": "Construye una comunidad, no solo clientes.", "desc": "Si tienes una tienda local o un pequeño negocio, Loyalfly te ayuda a crear conexiones duraderas y a convertir compradores ocasionales en tus fans número uno." },
+        "makeup": { "industry": "Nail & Makeup Artists", "title": "Belleza que recompensa.", "desc": "Ofrece un servicio gratuito o un descuento exclusivo después de varias visitas. Es la manera perfecta de agradecer a tus clientas por su confianza y lealtad." },
+        "barber": { "industry": "Estilistas y Barberos", "title": "Un corte por encima de la competencia.", "desc": "Fideliza a tu clientela con un programa de lealtad tan impecable como tus cortes. Un servicio gratuito cada ciertos cortes es un incentivo que funciona." }
+      }
+    }
+  },
+  "auth": {
+    "loginTitle": "Bienvenido de nuevo",
+    "loginSubtitle": "Inicia sesión en tu cuenta de negocio.",
+    "registerTitle": "Crea tu cuenta",
+    "registerSubtitle": "Empieza a fidelizar a tus clientes hoy.",
+    "businessName": "Nombre de tu Negocio",
+    "password": "Contraseña",
+    "confirmPassword": "Confirmar Contraseña",
+    "forgotPassword": " ¿Olvidaste tu contraseña?",
+    "noAccount": "¿No tienes una cuenta?",
+    "haveAccount": "¿Ya tienes una cuenta?",
+    "resetTitle": "Restablecer Contraseña",
+    "resetSubtitle": "Ingresa tu email para recibir un enlace.",
+    "sendLink": "Enviar enlace",
+    "backToLogin": "Volver a Iniciar Sesión",
+    "createAccount": "Crear Cuenta",
+    "creating": "Creando cuenta..."
+  },
+  "dashboard": {
+    "title": "Dashboard de Clientes",
+    "scanQr": "Escanear QR",
+    "newCustomer": "Nuevo Cliente",
+    "bulkUpload": "Carga Masiva",
+    "downloadCsv": "Descargar CSV",
+    "searchPlaceholder": "Buscar por nombre, teléfono o email",
+    "table": {
+      "stamps": "Sellos",
+      "rewards": "Recompensas",
+      "joined": "Fecha de Inscripción"
+    },
+    "actions": {
+      "redeem": "Redimir",
+      "stamp": "Sello"
+    },
+    "empty": "No se encontraron clientes."
+  },
+  "card": {
+    "previewTitle": "Previsualización",
+    "stampsForReward": "Sellos para tu recompensa",
+    "congrats": "¡Felicidades! ya tienes:",
+    "nextReward": "Tu próxima Recompensa:",
+    "join": "Únete a Loyalfly como",
+    "viewRegistration": "Ver Registro",
+    "copyUrl": "Copiar URL",
+    "shareTitle": "Comparte con tus clientes",
+    "editorTitle": "Editor de Tarjeta",
+    "businessNameLabel": "Nombre del Negocio",
+    "logoUrlLabel": "URL del Logo (Opcional)",
+    "rewardTextLabel": "Texto de la Recompensa",
+    "cardColorLabel": "Color de Fondo",
+    "textColorLabel": "Patrón de color del texto",
+    "dark": "Oscuro",
+    "light": "Claro",
+    "sampleStamps": "Sellos de Muestra",
+    "shareText": "Tus clientes pueden usar el siguiente enlace para unirse.",
+    "generateQr": "Genera QR",
+    "copied": "¡URL copiada!"
+  },
+  "cardEditor": {
+    "saveSuccess": "¡Cambios guardados con éxito!",
+    "saveError": "No se pudieron guardar los cambios.",
+    "loadError": "Error al cargar los datos de la tarjeta."
+  },
+  "metrics": {
+    "title": "Métricas de Lealtad",
+    "subtitle": "Un resumen del rendimiento de tu programa de lealtad.",
+    "totalCustomers": "Total de Clientes",
+    "totalCustomersDesc": "Miembros activos en tu programa.",
+    "stampsGiven": "Sellos Otorgados",
+    "stampsGivenDesc": "Total de sellos entregados a clientes.",
+    "rewardsRedeemed": "Recompensas Canjeadas",
+    "rewardsRedeemedDesc": "Clientes que completaron su tarjeta.",
+    "redemptionRate": "Tasa de Redención",
+    "redemptionRateDesc": "De los sellos para recompensa, cuántos se canjean.",
+    "chartTitle": "Nuevos Clientes por Mes",
+    "newCustomers": "Nuevos Clientes",
+    "topCustomersTitle": "Clientes Más Leales",
+    "emptyTopCustomers": "No hay suficientes datos de clientes."
+  },
+  "survey": {
+    "title": "Gestionar Encuesta",
+    "subtitle": "Configura la encuesta que verán tus clientes y revisa los resultados.",
+    "configTitle": "Configuración",
+    "active": "Activada",
+    "inactive": "Desactivada",
+    "bannerLabel": "Mensaje del Banner",
+    "questionLabel": "Pregunta",
+    "questionPlaceholder": "Ej: ¿Qué te pareció el servicio?",
+    "option1Label": "Opción 1",
+    "option1Placeholder": "Ej: Excelente",
+    "option2Label": "Opción 2",
+    "option2Placeholder": "Ej: Puede mejorar",
+    "resultsTitle": "Resultados de la Encuesta Actual",
+    "totalResponses": "Total de respuestas",
+    "emptyResponses": "Aún no hay respuestas para esta encuesta. Si acabas de crearla, las respuestas aparecerán aquí a medida que los clientes voten.",
+    "saveSuccess": "Configuración de encuesta guardada.",
+    "saveError": "No se pudo guardar la configuración.",
+    "requiredError": "La pregunta y ambas opciones son requeridas."
+  },
+  "publicView": {
+    "lookupTitle": "Consulta tu tarjeta",
+    "lookupSubtitle": "Tu número de teléfono (10 dígitos)",
+    "lookupBtn": "Consultar",
+    "registerTitle": "Regístrate",
+    "registerBtn": "Registrarme",
+    "newHere": "¿Eres nuevo?",
+    "registerLink": "Regístrate aquí",
+    "checkPoints": "Consulta tus sellos",
+    "consultOther": "Consultar otro número"
+  },
+  "pricing": {
+    "title": "Planes simples y transparentes",
+    "subtitle": "Elige el plan que se adapte al tamaño de tu negocio.",
+    "free": {
+      "name": "Gratis",
+      "desc": "Para empezar y probar."
+    },
+    "entrepreneur": {
+      "name": "Entrepreneur",
+      "desc": "Ideal para negocios en crecimiento."
+    },
+    "pro": {
+      "name": "Pro",
+      "desc": "Para negocios establecidos."
+    },
+    "features": {
+      "customers100": "Hasta 100 clientes",
+      "customers1000": "Hasta 1000 clientes",
+      "customersUnlimited": "Clientes ilimitados",
+      "digitalCard": "Tarjeta de lealtad digital",
+      "basicCustom": "Personalización básica",
+      "fullCustom": "Personalización completa",
+      "removeBranding": "Elimina botón 'Únete a Loyalfly'",
+      "emailSupport": "Soporte por email",
+      "prioritySupport": "Soporte prioritario"
+    },
+    "cta": {
+      "start": "Empezar",
+      "subscribe": "Suscribirse",
+      "contact": "Contáctanos"
+    }
+  }
+}
