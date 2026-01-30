@@ -68,7 +68,7 @@ const PublicCardPage: React.FC = () => {
     const [userEmail, setUserEmail] = useState('');
 
     // Google Wallet Cloud Function Base URL - UPDATED TO USER PROVIDED URL
-    const WALLET_FUNCTION_URL = "https://us-central1-loyalflyapp-3-5-sandbox.cloudfunctions.net/generateWalletPass";
+    const WALLET_FUNCTION_URL = "https://generatewalletpass-2idcsaj5va-uc.a.run.app";
 
     useEffect(() => {
         document.title = 'Loyalfly';
