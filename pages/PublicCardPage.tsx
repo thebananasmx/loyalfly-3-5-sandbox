@@ -202,12 +202,17 @@ const PublicCardPage: React.FC = () => {
         window.location.href = `${WALLET_FUNCTION_URL}?bid=${businessId}&cid=${customer.id}`;
     };
 
-    // Helper to get the correct localized badge from Google's static servers
+    // Helper to get the correct localized badge from Cloudinary provided assets
     const getWalletBadgeUrl = () => {
         const lang = i18n.language.split('-')[0];
-        const badgeLang = lang === 'es' ? 'es_ES' : lang === 'pt' ? 'pt_BR' : 'en_US';
-        // Using officially recommended static PNGs for maximum compatibility
-        return `https://developers.google.com/static/wallet/images/badges/${badgeLang}_add_to_google_wallet_wallet-badge.png`;
+        if (lang === 'es') {
+            return 'https://res.cloudinary.com/dg4wbuppq/image/upload/v1769737296/esUS_add_to_google_wallet_wallet-button_r0kqvi.png';
+        }
+        if (lang === 'pt') {
+            return 'https://res.cloudinary.com/dg4wbuppq/image/upload/v1769737451/pt_add_to_google_wallet_wallet-button_nvp9zt.png';
+        }
+        // Default to English
+        return 'https://res.cloudinary.com/dg4wbuppq/image/upload/v1769737309/enUS_add_to_google_wallet_wallet-button_l1iikm.png';
     };
     
     const renderContent = () => {
@@ -409,9 +414,9 @@ const PublicCardPage: React.FC = () => {
                                 <img 
                                     src={getWalletBadgeUrl()} 
                                     alt={t('card.addToWallet')}
-                                    className="h-[48px] w-auto shadow-sm rounded-lg"
+                                    className="h-[52px] w-auto shadow-sm rounded-lg"
                                     onError={(e) => {
-                                        // Fallback if PNG fails
+                                        // Simple fallback if cloudinary fails
                                         (e.target as HTMLImageElement).src = 'https://developers.google.com/static/wallet/images/badges/en_US_add_to_google_wallet_wallet-badge.png';
                                     }}
                                 />
