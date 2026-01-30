@@ -1,29 +1,52 @@
-
-import firebase from "firebase/app";
-import "firebase/auth";
-import "firebase/firestore";
+import { initializeApp } from "firebase/app";
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  sendPasswordResetEmail,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  updatePassword
+} from "firebase/auth";
+import {
+  getFirestore,
+  doc,
+  setDoc,
+  getDoc,
+  addDoc,
+  getDocs,
+  collection,
+  query,
+  where,
+  updateDoc,
+  serverTimestamp,
+  Timestamp,
+  deleteDoc,
+  orderBy,
+  limit,
+  startAfter,
+} from "firebase/firestore";
 import type { Customer, Business, BlogPost } from '../types';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCjw7oHwrRWTaAkPOUXlyHzePA5vfdBCBE",
-  authDomain: "loyalflyapp-3-5-sandbox.firebaseapp.com",
-  projectId: "loyalflyapp-3-5-sandbox",
-  storageBucket: "loyalflyapp-3-5-sandbox.firebasestorage.app",
-  messagingSenderId: "475685701287",
-  appId: "1:475685701287:web:fa8c10cfede3ba20543d82"
+  apiKey: "AIzaSyAnW9n-Ou53G1RmD0amMXJfQ_OadfefVug",
+  authDomain: "loyalflyapp-3-5.firebaseapp.com",
+  projectId: "loyalflyapp-3-5",
+  storageBucket: "loyalflyapp-3-5.appspot.com",
+  messagingSenderId: "110326324187",
+  appId: "1:110326324187:web:6516c54fab30370bf825fe",
+  measurementId: "G-Z4DE1F8NTK"
 };
 
-// FIX: Initializing Firebase using Namespaced (v8) syntax to match environment expectations where named exports are missing.
-if (!firebase.apps.length) {
-  firebase.initializeApp(firebaseConfig);
-}
-const auth = firebase.auth();
-const db = firebase.firestore();
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
 
 // --- HELPERS ---
 
 const slugify = (str: string) => {
-  if (!str) return '';
   str = str.replace(/^\s+|\s+$/g, ''); // trim
   str = str.toLowerCase();
 
@@ -55,35 +78,34 @@ const normalizeForSearch = (str: string) => {
 
 // --- AUTH FUNCTIONS ---
 
-// FIX: Replaced modular auth functions with namespaced (v8) methods.
 export const registerBusiness = async (email: string, password:string, businessName: string) => {
-  const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+  const userCredential = await createUserWithEmailAndPassword(auth, email, password);
   const user = userCredential.user;
-  if (!user) throw new Error("Registration failed");
 
   // Generate a unique slug in the 'businessSlugs' collection
   let slug = slugify(businessName);
-  let slugDoc = await db.collection("businessSlugs").doc(slug).get();
+  let slugDoc = await getDoc(doc(db, "businessSlugs", slug));
   let counter = 1;
-  while(slugDoc.exists) {
+  while(slugDoc.exists()) {
     slug = `${slugify(businessName)}-${counter}`;
-    slugDoc = await db.collection("businessSlugs").doc(slug).get();
+    slugDoc = await getDoc(doc(db, "businessSlugs", slug));
     counter++;
   }
 
-  await db.collection("businessSlugs").doc(slug).set({ businessId: user.uid });
+  await setDoc(doc(db, "businessSlugs", slug), { businessId: user.uid });
   
   // Create the main business document
-  await db.collection("businesses").doc(user.uid).set({
+  await setDoc(doc(db, "businesses", user.uid), {
     name: businessName,
     email: user.email,
     slug: slug,
     plan: 'Gratis', // Default plan
-    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    createdAt: serverTimestamp(),
   });
 
   // Create the card configuration in a subcollection
-  await db.collection("businesses").doc(user.uid).collection("config").doc("card").set({
+  const cardConfigRef = doc(db, "businesses", user.uid, "config", "card");
+  await setDoc(cardConfigRef, {
     name: businessName,
     reward: 'Tu Recompensa',
     color: '#FEF3C7',
@@ -92,13 +114,17 @@ export const registerBusiness = async (email: string, password:string, businessN
   });
 
   // --- ZAPIER TRIGGER ---
+  // Create a document in a separate collection to trigger the Zapier automation
+  // for the welcome email.
   try {
-    await db.collection("new_business_registrations").add({
+    const zapierTriggerCollectionRef = collection(db, "new_business_registrations");
+    await addDoc(zapierTriggerCollectionRef, {
       email: user.email,
       businessName: businessName,
-      registeredAt: firebase.firestore.FieldValue.serverTimestamp(),
+      registeredAt: serverTimestamp(),
     });
   } catch (error) {
+    // Log the error but don't block the user registration process
     console.error("Zapier trigger failed:", error);
   }
   
@@ -106,21 +132,21 @@ export const registerBusiness = async (email: string, password:string, businessN
 };
 
 export const loginWithEmail = async (email: string, pass: string) => {
-  const userCredential = await auth.signInWithEmailAndPassword(email, pass);
+  const userCredential = await signInWithEmailAndPassword(auth, email, pass);
   return {
-    uid: userCredential.user?.uid,
-    email: userCredential.user?.email,
+    uid: userCredential.user.uid,
+    email: userCredential.user.email,
   };
 };
 
 export const logout = async () => {
-  await auth.signOut();
+  await signOut(auth);
 };
 
-export const onAuthUserChanged = (callback: (user: any) => void) => auth.onAuthStateChanged(callback);
+export const onAuthUserChanged = (callback: (user: any) => void) => onAuthStateChanged(auth, callback);
 
 export const sendPasswordReset = async (email: string) => {
-  await auth.sendPasswordResetEmail(email);
+  await sendPasswordResetEmail(auth, email);
 };
 
 export const reauthenticateAndChangePassword = async (currentPassword: string, newPassword: string) => {
@@ -129,32 +155,36 @@ export const reauthenticateAndChangePassword = async (currentPassword: string, n
         throw new Error("No user is currently signed in.");
     }
     
-    const credential = firebase.auth.EmailAuthProvider.credential(user.email, currentPassword);
-    await user.reauthenticateWithCredential(credential);
-    await user.updatePassword(newPassword);
+    // Create a credential with the user's email and current password
+    const credential = EmailAuthProvider.credential(user.email, currentPassword);
+    
+    // Re-authenticate the user
+    await reauthenticateWithCredential(user, credential);
+    
+    // If re-authentication is successful, update the password
+    await updatePassword(user, newPassword);
 };
 
 
 // --- FIRESTORE FUNCTIONS ---
 
-// FIX: Replaced modular Firestore functions (doc, setDoc, getDoc, etc.) with namespaced (v8) chainable methods.
 export const getBusinessData = async (businessId: string): Promise<Business | null> => {
-    const businessDocRef = db.collection("businesses").doc(businessId);
-    const cardConfigRef = businessDocRef.collection("config").doc("card");
-    const surveyConfigRef = businessDocRef.collection("config").doc("survey");
-    const customersCol = businessDocRef.collection("customers");
+    const businessDocRef = doc(db, "businesses", businessId);
+    const cardConfigRef = doc(db, "businesses", businessId, "config", "card");
+    const surveyConfigRef = doc(db, "businesses", businessId, "config", "survey");
+    const customersCol = collection(db, `businesses/${businessId}/customers`);
 
     const [businessSnap, cardConfigSnap, surveyConfigSnap, customerSnapshot] = await Promise.all([
-        businessDocRef.get(),
-        cardConfigRef.get(),
-        surveyConfigRef.get(),
-        customersCol.get()
+        getDoc(businessDocRef),
+        getDoc(cardConfigRef),
+        getDoc(surveyConfigRef),
+        getDocs(customersCol)
     ]);
 
-    if (businessSnap.exists) {
+    if (businessSnap.exists()) {
         const businessData = businessSnap.data();
-        const cardSettings = cardConfigSnap.exists ? cardConfigSnap.data() : null;
-        const surveySettings = surveyConfigSnap.exists ? surveyConfigSnap.data() : null;
+        const cardSettings = cardConfigSnap.exists() ? cardConfigSnap.data() : null;
+        const surveySettings = surveyConfigSnap.exists() ? surveyConfigSnap.data() : null;
         
         return {
             id: businessId,
@@ -164,71 +194,62 @@ export const getBusinessData = async (businessId: string): Promise<Business | nu
             customerCount: customerSnapshot.size
         } as Business;
     } else {
+        console.log("No such business document!");
         return null;
     }
 }
 
 export const getBusinessIdBySlug = async (slug: string): Promise<string | null> => {
-    const slugDocSnap = await db.collection("businessSlugs").doc(slug).get();
-    if (slugDocSnap.exists) {
-        return slugDocSnap.data()?.businessId;
+    const slugDocRef = doc(db, "businessSlugs", slug);
+    const slugDocSnap = await getDoc(slugDocRef);
+    if (slugDocSnap.exists()) {
+        return slugDocSnap.data().businessId;
     }
     return null;
 }
 
 export const getPublicCardSettings = async (businessId: string) => {
-    const businessDocRef = db.collection("businesses").doc(businessId);
-    const cardConfigRef = businessDocRef.collection("config").doc("card");
+    const businessDocRef = doc(db, "businesses", businessId);
+    const cardConfigRef = doc(db, "businesses", businessId, "config", "card");
 
     const [businessSnap, cardConfigSnap] = await Promise.all([
-        businessDocRef.get(),
-        cardConfigRef.get()
+        getDoc(businessDocRef),
+        getDoc(cardConfigRef)
     ]);
 
-    if (cardConfigSnap.exists && businessSnap.exists) {
-        const businessData = businessSnap.data() || {};
-        const cardData = cardConfigSnap.data() || {};
+    if (cardConfigSnap.exists() && businessSnap.exists()) {
+        const businessData = businessSnap.data();
+        const cardData = cardConfigSnap.data();
         
         return {
             ...cardData,
             plan: businessData.plan || 'Gratis',
+            // Ensure name uses card config name if available, else business name
             name: cardData.name || businessData.name
         };
     } else {
+        console.log("No such card configuration or business!");
         return null;
     }
 }
 
 export const getCustomers = async (businessId: string, pageStartDoc: any = null): Promise<{ customers: Customer[], lastVisibleDoc: any | null }> => {
     const PAGE_SIZE = 25;
-    let q = db.collection("businesses").doc(businessId).collection("customers")
-              .orderBy("enrollmentDate", "desc")
-              .limit(PAGE_SIZE);
+    const customersCol = collection(db, `businesses/${businessId}/customers`);
     
+    const constraints: any[] = [orderBy("enrollmentDate", "desc"), limit(PAGE_SIZE)];
     if (pageStartDoc) {
-        q = q.startAfter(pageStartDoc);
+        constraints.push(startAfter(pageStartDoc));
     }
 
-    const customerSnapshot = await q.get();
+    const q = query(customersCol, ...constraints);
+    const customerSnapshot = await getDocs(q);
 
-    const customers = customerSnapshot.docs.map(doc => {
-        const data = doc.data();
-        const enrollmentDate = data.enrollmentDate;
-        let formattedDate = new Date().toISOString().split('T')[0];
-        
-        // FIX: Ensure correct handling of Timestamp objects in the namespaced SDK.
-        if (enrollmentDate instanceof firebase.firestore.Timestamp) {
-            formattedDate = enrollmentDate.toDate().toISOString().split('T')[0];
-        } else if (enrollmentDate && typeof enrollmentDate.toDate === 'function') {
-             formattedDate = enrollmentDate.toDate().toISOString().split('T')[0];
-        }
-
-        return { 
-            id: doc.id, 
-            ...data,
-            enrollmentDate: formattedDate
-        } as Customer;
-    });
+    const customers = customerSnapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data(),
+        enrollmentDate: (doc.data().enrollmentDate as Timestamp)?.toDate().toISOString().split('T')[0] || new Date().toISOString().split('T')[0]
+    } as Customer));
 
     const lastVisibleDoc = customerSnapshot.docs.length > 0 ? customerSnapshot.docs[customerSnapshot.docs.length - 1] : null;
 
@@ -236,65 +257,59 @@ export const getCustomers = async (businessId: string, pageStartDoc: any = null)
 };
 
 export const getAllCustomers = async (businessId: string): Promise<Customer[]> => {
-    const customerSnapshot = await db.collection("businesses").doc(businessId).collection("customers").get();
-    return customerSnapshot.docs.map(doc => {
-        const data = doc.data();
-        const enrollmentDate = data.enrollmentDate;
-        let formattedDate = new Date().toISOString().split('T')[0];
-        
-        if (enrollmentDate instanceof firebase.firestore.Timestamp) {
-            formattedDate = enrollmentDate.toDate().toISOString().split('T')[0];
-        }
-
-        return { 
-            id: doc.id, 
-            ...data,
-            enrollmentDate: formattedDate
-        } as Customer;
-    });
+    const customersCol = collection(db, `businesses/${businessId}/customers`);
+    const customerSnapshot = await getDocs(customersCol);
+    return customerSnapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data(),
+        enrollmentDate: (doc.data().enrollmentDate as Timestamp)?.toDate().toISOString().split('T')[0] || new Date().toISOString().split('T')[0]
+    } as Customer));
 };
 
 export const searchCustomers = async (businessId: string, searchQuery: string): Promise<Customer[]> => {
-    const customersCol = db.collection("businesses").doc(businessId).collection("customers");
+    const customersCol = collection(db, `businesses/${businessId}/customers`);
+    
     const normalizedNameQuery = normalizeForSearch(searchQuery);
     
-    // FIX: Using v8 chainable where and limit methods for multi-path search.
-    const nameQuery = customersCol
-        .where('searchableName', '>=', normalizedNameQuery)
-        .where('searchableName', '<=', normalizedNameQuery + '\uf8ff')
-        .limit(15);
+    // Query for name prefix using the normalized `searchableName` field
+    const nameQuery = query(
+        customersCol,
+        where('searchableName', '>=', normalizedNameQuery),
+        where('searchableName', '<=', normalizedNameQuery + '\uf8ff'),
+        limit(15)
+    );
 
-    const phoneQuery = customersCol
-        .where('phone', '>=', searchQuery)
-        .where('phone', '<=', searchQuery + '\uf8ff')
-        .limit(15);
+    // Query for phone prefix (remains unchanged)
+    const phoneQuery = query(
+        customersCol,
+        where('phone', '>=', searchQuery),
+        where('phone', '<=', searchQuery + '\uf8ff'),
+        limit(15)
+    );
 
-    const emailQuery = customersCol
-        .where('email', '>=', searchQuery)
-        .where('email', '<=', searchQuery + '\uf8ff')
-        .limit(15);
+    // Query for email prefix
+    const emailQuery = query(
+        customersCol,
+        where('email', '>=', searchQuery),
+        where('email', '<=', searchQuery + '\uf8ff'),
+        limit(15)
+    );
 
     const [nameSnapshot, phoneSnapshot, emailSnapshot] = await Promise.all([
-        nameQuery.get(),
-        phoneQuery.get(),
-        emailQuery.get()
+        getDocs(nameQuery),
+        getDocs(phoneQuery),
+        getDocs(emailQuery)
     ]);
 
     const customersMap = new Map<string, Customer>();
 
-    const processSnapshot = (snapshot: firebase.firestore.QuerySnapshot) => {
-        snapshot.docs.forEach((doc) => {
+    const processSnapshot = (snapshot: any) => {
+        snapshot.docs.forEach((doc: any) => {
             if (!customersMap.has(doc.id)) {
-                const data = doc.data();
-                const enrollmentDate = data.enrollmentDate;
-                let formattedDate = new Date().toISOString().split('T')[0];
-                if (enrollmentDate instanceof firebase.firestore.Timestamp) {
-                    formattedDate = enrollmentDate.toDate().toISOString().split('T')[0];
-                }
                 customersMap.set(doc.id, {
                     id: doc.id,
-                    ...data,
-                    enrollmentDate: formattedDate
+                    ...doc.data(),
+                    enrollmentDate: (doc.data().enrollmentDate as Timestamp)?.toDate().toISOString().split('T')[0] || new Date().toISOString().split('T')[0]
                 } as Customer);
             }
         });
@@ -308,52 +323,41 @@ export const searchCustomers = async (businessId: string, searchQuery: string): 
 };
 
 export const updateCardSettings = async (businessId: string, settings: { name: string; reward: string; color: string; textColorScheme: string; logoUrl?: string; }) => {
-    await db.collection("businesses").doc(businessId).collection("config").doc("card").set(settings, { merge: true });
+    const cardConfigRef = doc(db, "businesses", businessId, "config", "card");
+    await setDoc(cardConfigRef, settings, { merge: true });
     return { success: true, settings };
 };
 
 export const getCustomerByPhone = async (businessId: string, phone: string): Promise<Customer | null> => {
-    const querySnapshot = await db.collection("businesses").doc(businessId).collection("customers")
-        .where("phone", "==", phone)
-        .get();
+    const customersCol = collection(db, `businesses/${businessId}/customers`);
+    const q = query(customersCol, where("phone", "==", phone));
+    const querySnapshot = await getDocs(q);
 
     if (querySnapshot.empty) {
         return null;
     } else {
         const docSnap = querySnapshot.docs[0];
-        const data = docSnap.data();
-        const enrollmentDate = data.enrollmentDate;
-        let formattedDate = new Date().toISOString().split('T')[0];
-        if (enrollmentDate instanceof firebase.firestore.Timestamp) {
-            formattedDate = enrollmentDate.toDate().toISOString().split('T')[0];
-        }
         return { 
             id: docSnap.id, 
-            ...data,
-            enrollmentDate: formattedDate
+            ...docSnap.data(),
+            enrollmentDate: (docSnap.data().enrollmentDate as Timestamp)?.toDate().toISOString().split('T')[0] || new Date().toISOString().split('T')[0]
         } as Customer;
     }
 };
 
 export const addStampToCustomer = async (businessId: string, customerId: string, quantity: number = 1): Promise<Customer> => {
-    const customerDocRef = db.collection("businesses").doc(businessId).collection("customers").doc(customerId);
-    const customerSnap = await customerDocRef.get();
-    if (customerSnap.exists) {
-        const currentStamps = customerSnap.data()?.stamps || 0;
-        await customerDocRef.update({
+    const customerDocRef = doc(db, `businesses/${businessId}/customers`, customerId);
+    const customerSnap = await getDoc(customerDocRef);
+    if (customerSnap.exists()) {
+        const currentStamps = customerSnap.data().stamps || 0;
+        await updateDoc(customerDocRef, {
             stamps: currentStamps + quantity
         });
-        const updatedSnap = await customerDocRef.get();
-        const data = updatedSnap.data() || {};
-        const enrollmentDate = data.enrollmentDate;
-        let formattedDate = new Date().toISOString().split('T')[0];
-        if (enrollmentDate instanceof firebase.firestore.Timestamp) {
-            formattedDate = enrollmentDate.toDate().toISOString().split('T')[0];
-        }
+        const updatedSnap = await getDoc(customerDocRef);
         return { 
             id: updatedSnap.id, 
-            ...data,
-            enrollmentDate: formattedDate
+            ...updatedSnap.data(),
+            enrollmentDate: (updatedSnap.data().enrollmentDate as Timestamp)?.toDate().toISOString().split('T')[0] || new Date().toISOString().split('T')[0]
         } as Customer;
     } else {
         throw new Error("Customer not found");
@@ -361,33 +365,26 @@ export const addStampToCustomer = async (businessId: string, customerId: string,
 };
 
 export const redeemRewardForCustomer = async (businessId: string, customerId: string): Promise<Customer> => {
-    const customerDocRef = db.collection("businesses").doc(businessId).collection("customers").doc(customerId);
-    const customerSnap = await customerDocRef.get();
-    if (customerSnap.exists) {
-        const data = customerSnap.data() || {};
-        const currentStamps = data.stamps || 0;
-        const currentRewards = data.rewardsRedeemed || 0;
+    const customerDocRef = doc(db, `businesses/${businessId}/customers`, customerId);
+    const customerSnap = await getDoc(customerDocRef);
+    if (customerSnap.exists()) {
+        const currentStamps = customerSnap.data().stamps || 0;
+        const currentRewards = customerSnap.data().rewardsRedeemed || 0;
 
         if (currentStamps < 10) {
             throw new Error("Customer does not have enough stamps for a reward.");
         }
 
-        await customerDocRef.update({
+        await updateDoc(customerDocRef, {
             stamps: currentStamps - 10,
             rewardsRedeemed: currentRewards + 1
         });
 
-        const updatedSnap = await customerDocRef.get();
-        const updatedData = updatedSnap.data() || {};
-        const enrollmentDate = updatedData.enrollmentDate;
-        let formattedDate = new Date().toISOString().split('T')[0];
-        if (enrollmentDate instanceof firebase.firestore.Timestamp) {
-            formattedDate = enrollmentDate.toDate().toISOString().split('T')[0];
-        }
+        const updatedSnap = await getDoc(customerDocRef);
         return { 
             id: updatedSnap.id, 
-            ...updatedData,
-            enrollmentDate: formattedDate
+            ...updatedSnap.data(),
+            enrollmentDate: (updatedSnap.data().enrollmentDate as Timestamp)?.toDate().toISOString().split('T')[0] || new Date().toISOString().split('T')[0]
         } as Customer;
     } else {
         throw new Error("Customer not found");
@@ -414,14 +411,15 @@ export const createNewCustomer = async (businessId: string, data: { name: string
         throw new Error("LIMIT_REACHED");
     }
 
+    const customersCol = collection(db, `businesses/${businessId}/customers`);
     const newCustomerData = {
         ...data,
         searchableName: normalizeForSearch(data.name),
-        enrollmentDate: firebase.firestore.FieldValue.serverTimestamp(),
+        enrollmentDate: serverTimestamp(),
         stamps: 0,
         rewardsRedeemed: 0,
     };
-    const docRef = await db.collection("businesses").doc(businessId).collection("customers").add(newCustomerData);
+    const docRef = await addDoc(customersCol, newCustomerData);
     return {
         id: docRef.id,
         ...data,
@@ -432,50 +430,47 @@ export const createNewCustomer = async (businessId: string, data: { name: string
 };
 
 export const getCustomerById = async (businessId: string, customerId: string): Promise<Customer | null> => {
-    const docSnap = await db.collection("businesses").doc(businessId).collection("customers").doc(customerId).get();
-    if (docSnap.exists) {
-        const data = docSnap.data() || {};
-        const enrollmentDate = data.enrollmentDate;
-        let formattedDate = new Date().toISOString().split('T')[0];
-        if (enrollmentDate instanceof firebase.firestore.Timestamp) {
-            formattedDate = enrollmentDate.toDate().toISOString().split('T')[0];
-        }
+    const customerDocRef = doc(db, `businesses/${businessId}/customers`, customerId);
+    const docSnap = await getDoc(customerDocRef);
+    if (docSnap.exists()) {
         return { 
             id: docSnap.id, 
-            ...data,
-            enrollmentDate: formattedDate
+            ...docSnap.data(),
+            enrollmentDate: (docSnap.data().enrollmentDate as Timestamp)?.toDate().toISOString().split('T')[0] || new Date().toISOString().split('T')[0]
         } as Customer;
     }
     return null;
 };
 
 export const updateCustomer = async (businessId: string, customerId: string, data: { name: string, phone: string, email: string }): Promise<void> => {
+    const customerDocRef = doc(db, `businesses/${businessId}/customers`, customerId);
     const dataToUpdate: any = { ...data };
     if (data.name) {
         dataToUpdate.searchableName = normalizeForSearch(data.name);
     }
-    await db.collection("businesses").doc(businessId).collection("customers").doc(customerId).update(dataToUpdate);
+    await updateDoc(customerDocRef, dataToUpdate);
 };
 
 export const deleteCustomer = async (businessId: string, customerId: string): Promise<void> => {
-    await db.collection("businesses").doc(businessId).collection("customers").doc(customerId).delete();
+    const customerDocRef = doc(db, `businesses/${businessId}/customers`, customerId);
+    await deleteDoc(customerDocRef);
 };
 
 // --- SUPER ADMIN AUTH & HELPERS ---
 
 export const isSuperAdmin = async (userId: string): Promise<boolean> => {
     if (!userId) return false;
-    const adminDocSnap = await db.collection("super_admins").doc(userId).get();
-    return adminDocSnap.exists;
+    const adminDocRef = doc(db, "super_admins", userId);
+    const adminDocSnap = await getDoc(adminDocRef);
+    return adminDocSnap.exists();
 };
 
 export const registerSuperAdmin = async (email: string, password: string) => {
-    const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
-    if (!user) throw new Error("Admin registration failed");
-    await db.collection("super_admins").doc(user.uid).set({
+    await setDoc(doc(db, "super_admins", user.uid), {
         email: user.email,
-        registeredAt: firebase.firestore.FieldValue.serverTimestamp(),
+        registeredAt: serverTimestamp(),
     });
     return { uid: user.uid, email: user.email };
 };
@@ -496,12 +491,14 @@ export interface BusinessAdminData {
 }
 
 export const getAllBusinessesForSuperAdmin = async (): Promise<BusinessAdminData[]> => {
-    const businessSnapshot = await db.collection("businesses").get();
+    const businessCol = collection(db, "businesses");
+    const businessSnapshot = await getDocs(businessCol);
     const businesses = businessSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
     const businessesWithData = await Promise.all(
         businesses.map(async (business) => {
-            const customerSnapshot = await db.collection("businesses").doc(business.id).collection("customers").get();
+            const customersCol = collection(db, `businesses/${business.id}/customers`);
+            const customerSnapshot = await getDocs(customersCol);
             
             let totalStamps = 0;
             let totalRewards = 0;
@@ -513,7 +510,7 @@ export const getAllBusinessesForSuperAdmin = async (): Promise<BusinessAdminData
                 totalRewards += data.rewardsRedeemed || 0;
                 
                 const enrollDate = data.enrollmentDate;
-                if (enrollDate instanceof firebase.firestore.Timestamp) {
+                if (enrollDate instanceof Timestamp) {
                     customerEnrollmentDates.push(enrollDate.toMillis());
                 } else if (enrollDate) {
                     customerEnrollmentDates.push(new Date(enrollDate).getTime());
@@ -521,7 +518,7 @@ export const getAllBusinessesForSuperAdmin = async (): Promise<BusinessAdminData
             });
 
             const rawCreatedAt = (business as any).createdAt;
-            const dateObj = rawCreatedAt instanceof firebase.firestore.Timestamp ? rawCreatedAt.toDate() : (rawCreatedAt ? new Date(rawCreatedAt) : null);
+            const dateObj = rawCreatedAt instanceof Timestamp ? rawCreatedAt.toDate() : (rawCreatedAt ? new Date(rawCreatedAt) : null);
 
             return {
                 id: business.id,
@@ -541,16 +538,23 @@ export const getAllBusinessesForSuperAdmin = async (): Promise<BusinessAdminData
     return businessesWithData;
 };
 
+// Function for Landing Page - Aggregate Stats (Read-Only)
 export const getGlobalStats = async (): Promise<{ totalBusinesses: number; totalStamps: number; totalRewards: number }> => {
-    const businessSnapshot = await db.collection("businesses").get();
+    const businessCol = collection(db, "businesses");
+    const businessSnapshot = await getDocs(businessCol);
     const businesses = businessSnapshot.docs.map(doc => doc.id);
 
     let totalStamps = 0;
     let totalRewards = 0;
 
+    // Use Promise.all to fetch customer collections in parallel
+    // Note: In a production environment with thousands of businesses, this should be a cached cloud function.
+    // For MVP, this client-side aggregation is acceptable.
     await Promise.all(
         businesses.map(async (businessId) => {
-            const customerSnapshot = await db.collection("businesses").doc(businessId).collection("customers").get();
+            const customersCol = collection(db, `businesses/${businessId}/customers`);
+            const customerSnapshot = await getDocs(customersCol);
+            
             customerSnapshot.docs.forEach(doc => {
                 const data = doc.data();
                 totalStamps += data.stamps || 0;
@@ -567,37 +571,44 @@ export const getGlobalStats = async (): Promise<{ totalBusinesses: number; total
 };
 
 export const updateBusinessPlan = async (businessId: string, plan: 'Gratis' | 'Entrepreneur' | 'Pro') => {
-    await db.collection("businesses").doc(businessId).update({ plan });
+    const businessDocRef = doc(db, "businesses", businessId);
+    await updateDoc(businessDocRef, { plan });
 };
 
 export const deleteBusinessForSuperAdmin = async (businessId: string): Promise<void> => {
-    const businessDocRef = db.collection("businesses").doc(businessId);
-    const businessSnap = await businessDocRef.get();
-    if (!businessSnap.exists) throw new Error("Business not found");
-    const slug = businessSnap.data()?.slug;
+    const businessDocRef = doc(db, "businesses", businessId);
+    const businessSnap = await getDoc(businessDocRef);
+    if (!businessSnap.exists()) throw new Error("Business not found");
+    const slug = businessSnap.data().slug;
 
     // Delete subcollections
-    const customerSnapshot = await db.collection("businesses").doc(businessId).collection("customers").get();
-    await Promise.all(customerSnapshot.docs.map(d => d.ref.delete()));
+    const customerCol = collection(db, `businesses/${businessId}/customers`);
+    const customerSnapshot = await getDocs(customerCol);
+    await Promise.all(customerSnapshot.docs.map(d => deleteDoc(d.ref)));
 
-    const configSnapshot = await db.collection("businesses").doc(businessId).collection("config").get();
-    await Promise.all(configSnapshot.docs.map(d => d.ref.delete()));
+    const configCol = collection(db, `businesses/${businessId}/config`);
+    const configSnapshot = await getDocs(configCol);
+    await Promise.all(configSnapshot.docs.map(d => deleteDoc(d.ref)));
 
-    const surveyResponsesSnapshot = await db.collection("businesses").doc(businessId).collection("surveyResponses").get();
-    await Promise.all(surveyResponsesSnapshot.docs.map(d => d.ref.delete()));
+    const surveyResponsesCol = collection(db, `businesses/${businessId}/surveyResponses`);
+    const surveyResponsesSnapshot = await getDocs(surveyResponsesCol);
+    await Promise.all(surveyResponsesSnapshot.docs.map(d => deleteDoc(d.ref)));
 
     // Delete main doc and slug doc
-    await businessDocRef.delete();
+    await deleteDoc(businessDocRef);
     if (slug) {
-        await db.collection("businessSlugs").doc(slug).delete();
+        const slugDocRef = doc(db, "businessSlugs", slug);
+        await deleteDoc(slugDocRef);
     }
 };
 
 // --- SURVEY FUNCTIONS ---
 
 export const getSurveySettings = async (businessId: string) => {
-    const surveyConfigSnap = await db.collection("businesses").doc(businessId).collection("config").doc("survey").get();
-    if (surveyConfigSnap.exists) {
+    const surveyConfigRef = doc(db, "businesses", businessId, "config", "survey");
+    const surveyConfigSnap = await getDoc(surveyConfigRef);
+
+    if (surveyConfigSnap.exists()) {
         return surveyConfigSnap.data();
     } else {
         return null;
@@ -605,24 +616,23 @@ export const getSurveySettings = async (businessId: string) => {
 };
 
 export const updateSurveySettings = async (businessId: string, settings: any) => {
-    await db.collection("businesses").doc(businessId).collection("config").doc("survey").set(settings, { merge: true });
+    const surveyConfigRef = doc(db, "businesses", businessId, "config", "survey");
+    await setDoc(surveyConfigRef, settings, { merge: true });
 };
 
 export const getSurveyResponses = async (businessId: string, surveyId: string) => {
     if (!surveyId) return [];
-    const responseSnapshot = await db.collection("businesses").doc(businessId).collection("surveyResponses")
-        .where("surveyId", "==", surveyId)
-        .get();
+    const responsesCol = collection(db, `businesses/${businessId}/surveyResponses`);
+    const q = query(responsesCol, where("surveyId", "==", surveyId));
+    const responseSnapshot = await getDocs(q);
     return responseSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 };
 
 export const hasCustomerVoted = async (businessId: string, customerId: string, surveyId: string): Promise<boolean> => {
     if (!surveyId) return false;
-    const querySnapshot = await db.collection("businesses").doc(businessId).collection("surveyResponses")
-        .where("customerId", "==", customerId)
-        .where("surveyId", "==", surveyId)
-        .limit(1)
-        .get();
+    const responsesCol = collection(db, `businesses/${businessId}/surveyResponses`);
+    const q = query(responsesCol, where("customerId", "==", customerId), where("surveyId", "==", surveyId), limit(1));
+    const querySnapshot = await getDocs(q);
     return !querySnapshot.empty;
 };
 
@@ -632,26 +642,30 @@ export const submitSurveyResponse = async (businessId: string, customerId: strin
         throw new Error("Customer has already voted on this survey.");
     }
     
-    await db.collection("businesses").doc(businessId).collection("surveyResponses").add({
+    const responsesCol = collection(db, `businesses/${businessId}/surveyResponses`);
+    await addDoc(responsesCol, {
         customerId,
         customerName,
         response,
         surveyId,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        createdAt: serverTimestamp(),
     });
     
-    return await addStampToCustomer(businessId, customerId);
+    const updatedCustomer = await addStampToCustomer(businessId, customerId);
+    return updatedCustomer;
 };
 
 // --- BLOG FUNCTIONS ---
 
 export const createBlogPost = async (authorId: string, data: Omit<BlogPost, 'id' | 'createdAt' | 'slug'>): Promise<BlogPost> => {
+    const blogPostsCol = collection(db, 'blogPosts');
+    
     let slug = slugify(data.title);
-    let slugDoc = await db.collection("blogSlugs").doc(slug).get();
+    let slugDoc = await getDoc(doc(db, "blogSlugs", slug));
     let counter = 1;
-    while(slugDoc.exists) {
+    while(slugDoc.exists()) {
         slug = `${slugify(data.title)}-${counter}`;
-        slugDoc = await db.collection("blogSlugs").doc(slug).get();
+        slugDoc = await getDoc(doc(db, "blogSlugs", slug));
         counter++;
     }
 
@@ -659,54 +673,57 @@ export const createBlogPost = async (authorId: string, data: Omit<BlogPost, 'id'
         ...data,
         slug,
         authorId,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
     };
-    const docRef = await db.collection("blogPosts").add(newPostData);
-    await db.collection("blogSlugs").doc(slug).set({ postId: docRef.id });
+    const docRef = await addDoc(blogPostsCol, newPostData);
+    
+    await setDoc(doc(db, "blogSlugs", slug), { postId: docRef.id });
 
     return { ...newPostData, id: docRef.id, createdAt: new Date() } as BlogPost;
 };
 
 export const updateBlogPost = async (postId: string, data: Partial<Omit<BlogPost, 'id' | 'slug'>>): Promise<void> => {
-    await db.collection("blogPosts").doc(postId).update({ ...data, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    const postDocRef = doc(db, 'blogPosts', postId);
+    await updateDoc(postDocRef, { ...data, updatedAt: serverTimestamp() });
 };
 
 export const deleteBlogPost = async (postId: string, slug: string): Promise<void> => {
-    await db.collection("blogPosts").doc(postId).delete();
-    await db.collection("blogSlugs").doc(slug).delete();
+    const postDocRef = doc(db, 'blogPosts', postId);
+    const slugDocRef = doc(db, 'blogSlugs', slug);
+    await deleteDoc(postDocRef);
+    await deleteDoc(slugDocRef);
 };
 
 export const getPublishedBlogPosts = async (): Promise<BlogPost[]> => {
-    const snapshot = await db.collection("blogPosts").orderBy('createdAt', 'desc').get();
-    const allPosts = snapshot.docs.map(doc => {
-        const data = doc.data();
-        const createdAt = data.createdAt;
-        let dateObj = new Date();
-        if (createdAt instanceof firebase.firestore.Timestamp) dateObj = createdAt.toDate();
-        return { 
-            id: doc.id, 
-            ...data,
-            createdAt: dateObj
-        } as BlogPost;
-    });
+    const blogPostsCol = collection(db, 'blogPosts');
+    // Query only by createdAt to avoid needing a composite index.
+    const q = query(blogPostsCol, orderBy('createdAt', 'desc'));
+    const snapshot = await getDocs(q);
+    
+    const allPosts = snapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data(),
+        createdAt: (doc.data().createdAt as Timestamp)?.toDate() || new Date()
+    } as BlogPost));
+    
+    // Filter for published posts on the client side.
     return allPosts.filter(post => post.status === 'published');
 };
 
 export const getBlogPostBySlug = async (slug: string): Promise<BlogPost | null> => {
-    const slugDocSnap = await db.collection("blogSlugs").doc(slug).get();
-    if (slugDocSnap.exists) {
-        const postId = slugDocSnap.data()?.postId;
-        const postDocSnap = await db.collection("blogPosts").doc(postId).get();
-        if (postDocSnap.exists) {
-            const data = postDocSnap.data() || {};
-            const createdAt = data.createdAt;
-            let dateObj = new Date();
-            if (createdAt instanceof firebase.firestore.Timestamp) dateObj = createdAt.toDate();
+    const slugDocRef = doc(db, "blogSlugs", slug);
+    const slugDocSnap = await getDoc(slugDocRef);
+
+    if (slugDocSnap.exists()) {
+        const postId = slugDocSnap.data().postId;
+        const postDocRef = doc(db, 'blogPosts', postId);
+        const postDocSnap = await getDoc(postDocRef);
+        if (postDocSnap.exists()) {
             return { 
                 id: postDocSnap.id, 
-                ...data,
-                createdAt: dateObj
+                ...postDocSnap.data(),
+                createdAt: (postDocSnap.data().createdAt as Timestamp)?.toDate() || new Date()
             } as BlogPost;
         }
     }
@@ -714,31 +731,24 @@ export const getBlogPostBySlug = async (slug: string): Promise<BlogPost | null> 
 };
 
 export const getAllBlogPostsForAdmin = async (): Promise<BlogPost[]> => {
-    const snapshot = await db.collection("blogPosts").orderBy('createdAt', 'desc').get();
-    return snapshot.docs.map(doc => {
-        const data = doc.data();
-        const createdAt = data.createdAt;
-        let formattedDate = new Date().toISOString().split('T')[0];
-        if (createdAt instanceof firebase.firestore.Timestamp) formattedDate = createdAt.toDate().toISOString().split('T')[0];
-        return { 
-            id: doc.id, 
-            ...data,
-            createdAt: formattedDate
-        } as BlogPost;
-    });
+    const blogPostsCol = collection(db, 'blogPosts');
+    const q = query(blogPostsCol, orderBy('createdAt', 'desc'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data(),
+        createdAt: (doc.data().createdAt as Timestamp)?.toDate().toISOString().split('T')[0] || new Date().toISOString().split('T')[0]
+    } as BlogPost));
 };
 
 export const getBlogPostById = async (postId: string): Promise<BlogPost | null> => {
-    const docSnap = await db.collection("blogPosts").doc(postId).get();
-    if (docSnap.exists) {
-        const data = docSnap.data() || {};
-        const createdAt = data.createdAt;
-        let dateObj = new Date();
-        if (createdAt instanceof firebase.firestore.Timestamp) dateObj = createdAt.toDate();
+    const postDocRef = doc(db, 'blogPosts', postId);
+    const docSnap = await getDoc(postDocRef);
+    if (docSnap.exists()) {
         return { 
             id: docSnap.id, 
-            ...data,
-            createdAt: dateObj
+            ...docSnap.data(),
+            createdAt: (docSnap.data().createdAt as Timestamp)?.toDate() || new Date()
         } as BlogPost;
     }
     return null;
@@ -756,6 +766,7 @@ export interface BusinessMetrics {
 
 export const getBusinessMetrics = async (businessId: string): Promise<BusinessMetrics> => {
     const customers = await getAllCustomers(businessId);
+
     let totalStamps = 0;
     let totalRewards = 0;
     const customerGrowth: { [key: string]: number } = {};
@@ -765,6 +776,7 @@ export const getBusinessMetrics = async (businessId: string): Promise<BusinessMe
     customers.forEach(customer => {
         totalStamps += customer.stamps || 0;
         totalRewards += customer.rewardsRedeemed || 0;
+        
         const enrollmentDate = new Date(customer.enrollmentDate);
         if (enrollmentDate >= sixMonthsAgo) {
             const month = enrollmentDate.toLocaleString('es-MX', { month: 'long', year: '2-digit' });
@@ -774,6 +786,7 @@ export const getBusinessMetrics = async (businessId: string): Promise<BusinessMe
 
     const redemptionRate = totalStamps > 0 ? (totalRewards * 10) / totalStamps * 100 : 0;
 
+    // Format customer growth data for the chart
     const newCustomersByMonth = Array.from({ length: 6 }).map((_, i) => {
         const d = new Date();
         d.setMonth(d.getMonth() - i);
@@ -782,6 +795,7 @@ export const getBusinessMetrics = async (businessId: string): Promise<BusinessMe
         month: monthKey.split(' de ')[0].charAt(0).toUpperCase() + monthKey.split(' de ')[0].slice(1),
         count: customerGrowth[monthKey] || 0
     }));
+
 
     const topCustomers = [...customers]
         .sort((a, b) => (b.stamps || 0) - (a.stamps || 0))

@@ -41,11 +41,7 @@ import AdminBusinessDetailPage from './pages/AdminBusinessDetailPage';
 function App() {
   // Use BrowserRouter for production/Vercel domains and HashRouter for all other environments
   // (like local development and AI Studio previews) to ensure maximum compatibility.
-  const hostname = window.location.hostname;
-  const isProductionLike = hostname.endsWith('loyalfly.com.mx') || 
-                           hostname.includes('vercel.app') || 
-                           hostname.includes('sandbox');
-                           
+  const isProductionLike = window.location.hostname.endsWith('loyalfly.com.mx') || window.location.hostname.includes('vercel.app');
   const Router = isProductionLike ? BrowserRouter : HashRouter;
 
   return (
