@@ -31,13 +31,12 @@ import {
 import type { Customer, Business, BlogPost } from '../types';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAnW9n-Ou53G1RmD0amMXJfQ_OadfefVug",
-  authDomain: "loyalflyapp-3-5.firebaseapp.com",
-  projectId: "loyalflyapp-3-5",
-  storageBucket: "loyalflyapp-3-5.appspot.com",
-  messagingSenderId: "110326324187",
-  appId: "1:110326324187:web:6516c54fab30370bf825fe",
-  measurementId: "G-Z4DE1F8NTK"
+  apiKey: "AIzaSyCjw7oHwrRWTaAkPOUXlyHzePA5vfdBCBE",
+  authDomain: "loyalflyapp-3-5-sandbox.firebaseapp.com",
+  projectId: "loyalflyapp-3-5-sandbox",
+  storageBucket: "loyalflyapp-3-5-sandbox.firebasestorage.app",
+  messagingSenderId: "475685701287",
+  appId: "1:475685701287:web:fa8c10cfede3ba20543d82"
 };
 
 const app = initializeApp(firebaseConfig);
