@@ -14,16 +14,20 @@ exports.generateWalletPass = functions.https.onRequest(async (req, res) => {
     return res.status(400).send("Faltan parámetros: bid (Business ID) y cid (Customer ID) son requeridos.");
   }
 
-  // ID de Emisor de Google Pay
+  // ID de Emisor de Google Pay (Asegúrate que este ID sea el correcto en tu consola de Google Pay)
   const ISSUER_ID = "3388000000023072020";
 
   try {
-    // 1. Obtener datos del negocio
+    // 1. Obtener datos del negocio (Configuración de la tarjeta)
     const businessCardSnap = await db.doc(`businesses/${bid}/config/card`).get();
+    const businessMainSnap = await db.doc(`businesses/${bid}`).get();
+    
     if (!businessCardSnap.exists) {
       return res.status(404).send("Configuración de negocio no encontrada.");
     }
-    const businessData = businessCardSnap.data();
+    
+    const businessCardData = businessCardSnap.data();
+    const businessMainData = businessMainSnap.exists ? businessMainSnap.data() : { name: "Loyalfly Business" };
 
     // 2. Obtener datos del cliente
     const customerSnap = await db.doc(`businesses/${bid}/customers/${cid}`).get();
@@ -32,53 +36,78 @@ exports.generateWalletPass = functions.https.onRequest(async (req, res) => {
     }
     const customerData = customerSnap.data();
 
-    // Lógica de sellos (Asumiendo meta de 10)
+    // Lógica de sellos
     const currentStamps = customerData.stamps || 0;
-    const stampsLabel = `${currentStamps} / 10 Estrellas`;
+    const totalStamps = 10;
+    const stampsLabel = `${currentStamps} de ${totalStamps} estrellas`;
 
-    // 3. Construir el objeto para Google Wallet
+    // Identificadores únicos requeridos por Google
+    const classId = `${ISSUER_ID}.CLASS_${bid}`;
+    const objectId = `${ISSUER_ID}.OBJ_${bid}_${cid}`;
+
+    // 3. Definir la CLASE (La plantilla del negocio)
+    const genericClass = {
+      id: classId,
+      classTemplateInfo: {
+        cardBarcodeSectionDetails: {
+          firstTopDetail: {
+            fieldSelector: "f_stamps_label"
+          }
+        },
+        primaryLayoutSectionId: "f_reward_section"
+      },
+      issuerName: businessMainData.name || businessCardData.name,
+      reviewStatus: "UNDER_REVIEW"
+    };
+
+    // 4. Definir el OBJETO (La tarjeta del cliente específico)
     const genericObject = {
-      id: `${ISSUER_ID}.OBJ_${cid}`,
-      classId: `${ISSUER_ID}.CLASS_${bid}`,
+      id: objectId,
+      classId: classId,
       genericType: "GENERIC_TYPE_UNSPECIFIED",
-      hexBackgroundColor: businessData.color || "#5134F9",
-      logo: businessData.logoUrl ? {
+      hexBackgroundColor: businessCardData.color || "#4D17FF",
+      logo: businessCardData.logoUrl ? {
         sourceUri: {
-          uri: businessData.logoUrl
+          uri: businessCardData.logoUrl
+        },
+        description: {
+          defaultValue: { language: "es", value: "Logo" }
         }
       } : undefined,
       cardTitle: {
-        defaultValue: { language: "es", value: businessData.name || "Loyalfly" },
+        defaultValue: { language: "es", value: businessCardData.name || businessMainData.name },
       },
       header: {
-        defaultValue: { language: "es", value: customerData.name || "Mi Tarjeta" },
+        defaultValue: { language: "es", value: customerData.name },
       },
-      // Módulos de texto dinámicos
+      // Campos de texto dinámicos
       textModulesData: [
         {
-          header: "PROGRESO",
+          header: "ESTRELLAS",
           body: stampsLabel,
-          id: "stamps_module"
+          id: "f_stamps_label"
         },
         {
-          header: "RECOMPENSA",
-          body: businessData.reward || "Tu Recompensa",
-          id: "reward_module"
+          header: "TU RECOMPENSA",
+          body: businessCardData.reward || "¡Sigue sumando!",
+          id: "f_reward_section"
         }
       ],
       barcode: {
         type: "QR_CODE",
         value: cid,
-        alternateText: "ID de Cliente: " + cid
-      },
+        alternateText: "ID: " + cid
+      }
     };
 
+    // 5. Construir el Token JWT con Clase y Objeto
     const claims = {
       iss: serviceAccount.client_email,
       aud: "google",
       origins: [],
       typ: "savetowallet",
       payload: {
+        genericClasses: [genericClass],
         genericObjects: [genericObject],
       },
     };
