@@ -414,7 +414,7 @@ const PublicCardPage: React.FC = () => {
                                 <img 
                                     src={getWalletBadgeUrl()} 
                                     alt={t('card.addToWallet')}
-                                    className="h-[45px] w-auto shadow-sm rounded-lg"
+                                    className="h-[40px] w-auto shadow-sm rounded-lg"
                                     onError={(e) => {
                                         // Simple fallback if cloudinary fails
                                         (e.target as HTMLImageElement).src = 'https://developers.google.com/static/wallet/images/badges/en_US_add_to_google_wallet_wallet-badge.png';
