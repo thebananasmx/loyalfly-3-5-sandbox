@@ -14,7 +14,7 @@ exports.generateWalletPass = functions.https.onRequest(async (req, res) => {
     return res.status(400).send("Faltan parámetros: bid (Business ID) y cid (Customer ID) son requeridos.");
   }
 
-  // ID de Emisor de Google Pay
+  // ID de Emisor de Google Pay (Asegúrate que este número coincida con tu consola)
   const ISSUER_ID = "3388000000023072020";
 
   try {
@@ -28,23 +28,22 @@ exports.generateWalletPass = functions.https.onRequest(async (req, res) => {
     // 2. Obtener datos del cliente
     const customerSnap = await db.doc(`businesses/${bid}/customers/${cid}`).get();
     if (!customerSnap.exists) {
-      return res.status(404).send("Cliente no encontrado.");
+      return res.status(404).send("Cliente no encontrado en la base de datos.");
     }
     const customerData = customerSnap.data();
 
-    // Lógica de sellos
     const currentStamps = customerData.stamps || 0;
     const totalStamps = 10;
     const stampsLabel = `${currentStamps} de ${totalStamps} estrellas`;
 
-    // Limpiar IDs (Solo alfanuméricos y guiones bajos)
+    // Limpiar IDs para evitar caracteres no permitidos por Google
     const safeBid = bid.replace(/[^a-zA-Z0-9_]/g, '');
     const safeCid = cid.replace(/[^a-zA-Z0-9_]/g, '');
     
     const classId = `${ISSUER_ID}.CLASS_${safeBid}`;
     const objectId = `${ISSUER_ID}.OBJ_${safeBid}_${safeCid}`;
 
-    // 3. Definir la CLASE (Template)
+    // 3. Definir la CLASE
     const genericClass = {
       id: classId,
       classTemplateInfo: {
@@ -59,18 +58,18 @@ exports.generateWalletPass = functions.https.onRequest(async (req, res) => {
       reviewStatus: "UNDER_REVIEW"
     };
 
-    // 4. Definir el OBJETO (Pase del cliente)
+    // 4. Definir el OBJETO
     const genericObject = {
       id: objectId,
       classId: classId,
-      genericType: "GENERIC_TYPE_UNSPECIFIED", // Valor correcto para la API genérica
+      genericType: "GENERIC_TYPE_UNSPECIFIED", // Valor estándar para objetos genéricos
       hexBackgroundColor: businessCardData.color || "#4D17FF",
       logo: businessCardData.logoUrl ? {
         sourceUri: {
           uri: businessCardData.logoUrl
         },
         contentDescription: {
-          defaultValue: { language: "es-419", value: "Logo del negocio" }
+          defaultValue: { language: "es-419", value: "Logo de " + (businessMainData.name || "Negocio") }
         }
       } : undefined,
       cardTitle: {
@@ -102,6 +101,7 @@ exports.generateWalletPass = functions.https.onRequest(async (req, res) => {
     const claims = {
       iss: serviceAccount.client_email,
       aud: "google",
+      origins: [],
       typ: "savetowallet",
       payload: {
         genericClasses: [genericClass],
@@ -109,9 +109,9 @@ exports.generateWalletPass = functions.https.onRequest(async (req, res) => {
       },
     };
 
-    // Lógica robusta para la llave privada
+    // Limpieza robusta de la llave privada
     let privateKey = serviceAccount.private_key;
-    if (!privateKey.includes('\n')) {
+    if (privateKey && !privateKey.includes('\n')) {
       privateKey = privateKey.replace(/\\n/g, '\n');
     }
 
@@ -124,7 +124,7 @@ exports.generateWalletPass = functions.https.onRequest(async (req, res) => {
     res.redirect(`https://pay.google.com/gp/v/save/${token}`);
 
   } catch (error) {
-    console.error("Error detallado:", error);
+    console.error("Error crítico:", error);
     res.status(500).send("Error interno: " + error.message);
   }
 });
