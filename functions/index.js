@@ -14,19 +14,15 @@ exports.generateWalletPass = functions.https.onRequest(async (req, res) => {
     return res.status(400).send("Faltan parámetros: bid (Business ID) y cid (Customer ID) son requeridos.");
   }
 
-  // ID de Emisor de Google Pay (Asegúrate que este ID sea el correcto en tu consola de Google Pay)
+  // ID de Emisor de Google Pay
   const ISSUER_ID = "3388000000023072020";
 
   try {
-    // 1. Obtener datos del negocio (Configuración de la tarjeta)
+    // 1. Obtener datos del negocio
     const businessCardSnap = await db.doc(`businesses/${bid}/config/card`).get();
     const businessMainSnap = await db.doc(`businesses/${bid}`).get();
     
-    if (!businessCardSnap.exists) {
-      return res.status(404).send("Configuración de negocio no encontrada.");
-    }
-    
-    const businessCardData = businessCardSnap.data();
+    const businessCardData = businessCardSnap.exists ? businessCardSnap.data() : {};
     const businessMainData = businessMainSnap.exists ? businessMainSnap.data() : { name: "Loyalfly Business" };
 
     // 2. Obtener datos del cliente
@@ -41,11 +37,14 @@ exports.generateWalletPass = functions.https.onRequest(async (req, res) => {
     const totalStamps = 10;
     const stampsLabel = `${currentStamps} de ${totalStamps} estrellas`;
 
-    // Identificadores únicos requeridos por Google
-    const classId = `${ISSUER_ID}.CLASS_${bid}`;
-    const objectId = `${ISSUER_ID}.OBJ_${bid}_${cid}`;
+    // Limpiar IDs (Solo alfanuméricos y guiones bajos)
+    const safeBid = bid.replace(/[^a-zA-Z0-9_]/g, '');
+    const safeCid = cid.replace(/[^a-zA-Z0-9_]/g, '');
+    
+    const classId = `${ISSUER_ID}.CLASS_${safeBid}`;
+    const objectId = `${ISSUER_ID}.OBJ_${safeBid}_${safeCid}`;
 
-    // 3. Definir la CLASE (La plantilla del negocio)
+    // 3. Definir la CLASE (Template)
     const genericClass = {
       id: classId,
       classTemplateInfo: {
@@ -56,31 +55,30 @@ exports.generateWalletPass = functions.https.onRequest(async (req, res) => {
         },
         primaryLayoutSectionId: "f_reward_section"
       },
-      issuerName: businessMainData.name || businessCardData.name,
+      issuerName: businessMainData.name || "Loyalfly Business",
       reviewStatus: "UNDER_REVIEW"
     };
 
-    // 4. Definir el OBJETO (La tarjeta del cliente específico)
+    // 4. Definir el OBJETO (Pase del cliente)
     const genericObject = {
       id: objectId,
       classId: classId,
-      genericType: "GENERIC_TYPE_UNSPECIFIED",
+      genericType: "GENERIC_TYPE_UNSPECIFIED", // Valor correcto para la API genérica
       hexBackgroundColor: businessCardData.color || "#4D17FF",
       logo: businessCardData.logoUrl ? {
         sourceUri: {
           uri: businessCardData.logoUrl
         },
-        description: {
-          defaultValue: { language: "es", value: "Logo" }
+        contentDescription: {
+          defaultValue: { language: "es-419", value: "Logo del negocio" }
         }
       } : undefined,
       cardTitle: {
-        defaultValue: { language: "es", value: businessCardData.name || businessMainData.name },
+        defaultValue: { language: "es-419", value: businessCardData.name || businessMainData.name || "Tarjeta de Lealtad" },
       },
       header: {
-        defaultValue: { language: "es", value: customerData.name },
+        defaultValue: { language: "es-419", value: customerData.name || "Cliente" },
       },
-      // Campos de texto dinámicos
       textModulesData: [
         {
           header: "ESTRELLAS",
@@ -96,15 +94,14 @@ exports.generateWalletPass = functions.https.onRequest(async (req, res) => {
       barcode: {
         type: "QR_CODE",
         value: cid,
-        alternateText: "ID: " + cid
+        alternateText: "ID Cliente: " + cid
       }
     };
 
-    // 5. Construir el Token JWT con Clase y Objeto
+    // 5. Configurar el JWT
     const claims = {
       iss: serviceAccount.client_email,
       aud: "google",
-      origins: [],
       typ: "savetowallet",
       payload: {
         genericClasses: [genericClass],
@@ -112,17 +109,22 @@ exports.generateWalletPass = functions.https.onRequest(async (req, res) => {
       },
     };
 
+    // Lógica robusta para la llave privada
+    let privateKey = serviceAccount.private_key;
+    if (!privateKey.includes('\n')) {
+      privateKey = privateKey.replace(/\\n/g, '\n');
+    }
+
     const token = jwt.sign(
       claims,
-      serviceAccount.private_key,
+      privateKey,
       { algorithm: "RS256" },
     );
 
-    // Redirección final a Google Wallet
     res.redirect(`https://pay.google.com/gp/v/save/${token}`);
 
   } catch (error) {
-    console.error("Error generando el pase:", error);
-    res.status(500).send("Error interno al generar el pase: " + error.message);
+    console.error("Error detallado:", error);
+    res.status(500).send("Error interno: " + error.message);
   }
 });
