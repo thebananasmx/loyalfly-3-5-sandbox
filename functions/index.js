@@ -41,19 +41,27 @@ exports.generateWalletPass = functions.https.onRequest(async (req, res) => {
     const totalStamps = 10;
     const stampsLabel = `${currentStamps} de ${totalStamps} estrellas`;
 
-    const safeBid = bid.replace(/[^a-zA-Z0-9_]/g, '');
-    const safeCid = cid.replace(/[^a-zA-Z0-9_]/g, '');
+    // Google Wallet IDs no permiten caracteres especiales complejos, solo guiones bajos y alfanuméricos
+    const safeBid = bid.replace(/[^a-zA-Z0-9_]/g, '_');
+    const safeCid = cid.replace(/[^a-zA-Z0-9_]/g, '_');
     
     const classId = `${ISSUER_ID}.CLASS_${safeBid}`;
     const objectId = `${ISSUER_ID}.OBJ_${safeBid}_${safeCid}`;
 
-    // Validación de Logo: Google falla si la URL no es HTTPS o está vacía
+    // Validación de Logo: Google falla con SVG. Forzamos PNG si es Cloudinary.
     let logoObj = undefined;
-    if (businessCardData.logoUrl && businessCardData.logoUrl.startsWith('http')) {
+    let finalLogoUrl = businessCardData.logoUrl || "https://res.cloudinary.com/dg4wbuppq/image/upload/v1762622899/ico_loyalfly_xgfdv8.png";
+    
+    if (finalLogoUrl.startsWith('http')) {
+        // Truco de Cloudinary: Si termina en .svg, lo cambiamos a .png para que Google lo acepte
+        if (finalLogoUrl.includes('cloudinary.com') && finalLogoUrl.endsWith('.svg')) {
+            finalLogoUrl = finalLogoUrl.replace('.svg', '.png');
+        }
+
         logoObj = {
-            sourceUri: { uri: businessCardData.logoUrl },
+            sourceUri: { uri: finalLogoUrl },
             contentDescription: {
-              defaultValue: { language: "es-419", value: "Logo de " + businessMainData.name }
+              defaultValue: { language: "es-419", value: "Logo" }
             }
         };
     }
@@ -68,7 +76,7 @@ exports.generateWalletPass = functions.https.onRequest(async (req, res) => {
         },
         primaryLayoutSectionId: "f_reward_section"
       },
-      issuerName: businessMainData.name || "Loyalfly Business",
+      issuerName: (businessMainData.name || "Loyalfly").substring(0, 20),
       reviewStatus: "UNDER_REVIEW"
     };
 
@@ -76,13 +84,13 @@ exports.generateWalletPass = functions.https.onRequest(async (req, res) => {
       id: objectId,
       classId: classId,
       genericType: "GENERIC_TYPE_UNSPECIFIED",
-      hexBackgroundColor: businessCardData.color || "#4D17FF",
+      hexBackgroundColor: (businessCardData.color || "#4D17FF").toUpperCase(),
       logo: logoObj,
       cardTitle: {
-        defaultValue: { language: "es-419", value: businessCardData.name || businessMainData.name || "Tarjeta de Lealtad" },
+        defaultValue: { language: "es-419", value: (businessCardData.name || businessMainData.name || "Loyalfly").substring(0, 20) },
       },
       header: {
-        defaultValue: { language: "es-419", value: customerData.name || "Cliente" },
+        defaultValue: { language: "es-419", value: (customerData.name || "Cliente").substring(0, 20) },
       },
       textModulesData: [
         {
@@ -92,7 +100,7 @@ exports.generateWalletPass = functions.https.onRequest(async (req, res) => {
         },
         {
           header: "TU RECOMPENSA",
-          body: businessCardData.reward || "¡Sigue sumando!",
+          body: (businessCardData.reward || "¡Sigue sumando!").substring(0, 50),
           id: "f_reward_section"
         }
       ],
