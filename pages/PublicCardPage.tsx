@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import CardPreview from '../components/CardPreview';
@@ -414,7 +415,7 @@ const PublicCardPage: React.FC = () => {
                                 <img 
                                     src={getWalletBadgeUrl()} 
                                     alt={t('card.addToWallet')}
-                                    className="h-[40px] w-auto shadow-sm rounded-lg"
+                                    className="h-[52px] w-auto shadow-sm rounded-lg"
                                     onError={(e) => {
                                         // Simple fallback if cloudinary fails
                                         (e.target as HTMLImageElement).src = 'https://developers.google.com/static/wallet/images/badges/en_US_add_to_google_wallet_wallet-badge.png';

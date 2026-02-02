@@ -10,8 +10,6 @@ const db = admin.firestore();
 exports.generateWalletPass = functions.https.onRequest(async (req, res) => {
   const { bid, cid } = req.query;
 
-  console.log(`Diagnosticando pase - Business: ${bid}, Customer: ${cid}`);
-
   if (!bid || !cid) {
     return res.status(400).send("Faltan parámetros requeridos.");
   }
@@ -29,15 +27,19 @@ exports.generateWalletPass = functions.https.onRequest(async (req, res) => {
     const businessMainData = businessMainSnap.exists ? businessMainSnap.data() : { name: "Loyalfly" };
     const customerData = customerSnap.data();
 
-    // Limpieza estricta de IDs (Solo alfanuméricos)
+    const currentStamps = customerData.stamps || 0;
+    const stampsLabel = `${currentStamps} de 10 sellos`;
+    const rewardText = (businessCardData.reward || "¡Premio!").substring(0, 50);
+
+    // Limpieza de IDs
     const safeBid = bid.replace(/[^a-zA-Z0-9]/g, '');
     const safeCid = cid.replace(/[^a-zA-Z0-9]/g, '');
     
-    const classId = `${ISSUER_ID}.CLS_${safeBid}`;
+    // IMPORTANTE: Cambiamos a V2 para forzar nueva estructura en Google
+    const classId = `${ISSUER_ID}.V2_${safeBid}`;
     const objectId = `${ISSUER_ID}.OBJ_${safeBid}_${safeCid}`;
 
-    // Logo: Google FALLA si no es HTTPS o si es SVG. 
-    // Si es Cloudinary, forzamos PNG. Si no hay logo, NO enviamos el objeto logo.
+    // Logo logic
     let logoObj = undefined;
     let logoUrl = businessCardData.logoUrl;
     if (logoUrl && logoUrl.startsWith('http')) {
@@ -50,13 +52,21 @@ exports.generateWalletPass = functions.https.onRequest(async (req, res) => {
         };
     }
 
-    // Payload Mínimo Viable (Sin plantillas complejas para evitar errores de validación)
+    // Configuración de la CLASE (Plantilla)
     const genericClass = {
       id: classId,
       issuerName: (businessMainData.name || "Loyalfly").substring(0, 20),
-      reviewStatus: "UNDER_REVIEW"
+      reviewStatus: "UNDER_REVIEW",
+      classTemplateInfo: {
+        cardBarcodeSectionDetails: {
+          firstTopDetail: {
+            fieldSelector: "f_stamps" 
+          }
+        }
+      }
     };
 
+    // Configuración del OBJETO (Datos del Cliente)
     const genericObject = {
       id: objectId,
       classId: classId,
@@ -69,9 +79,22 @@ exports.generateWalletPass = functions.https.onRequest(async (req, res) => {
       header: {
         defaultValue: { language: "es-419", value: (customerData.name || "Cliente").substring(0, 20) }
       },
+      textModulesData: [
+        {
+          header: "MIS SELLOS",
+          body: stampsLabel,
+          id: "f_stamps"
+        },
+        {
+          header: "RECOMPENSA",
+          body: rewardText,
+          id: "f_reward"
+        }
+      ],
       barcode: {
         type: "QR_CODE",
-        value: cid
+        value: cid,
+        alternateText: `ID: ${cid.substring(0, 8)}`
       }
     };
 
@@ -92,11 +115,10 @@ exports.generateWalletPass = functions.https.onRequest(async (req, res) => {
     }
 
     const token = jwt.sign(claims, privateKey, { algorithm: "RS256" });
-    console.log(`Redirigiendo a Google con Token para objeto: ${objectId}`);
     res.redirect(`https://pay.google.com/gp/v/save/${token}`);
 
   } catch (error) {
-    console.error("ERROR:", error);
-    res.status(500).send("Error: " + error.message);
+    console.error("ERROR WALLET:", error);
+    res.status(500).send("Error interno: " + error.message);
   }
 });
