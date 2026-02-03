@@ -57,7 +57,8 @@ exports.generatewalletpass = onRequest({
     const safeBid = bid.replace(/[^a-zA-Z0-9]/g, '');
     const safeCid = cid.replace(/[^a-zA-Z0-9]/g, '');
     
-    const classId = `${ISSUER_ID}.V7_${safeBid}`; // Incrementamos versión por cambio de estructura visual
+    // CAMBIO A V10: Forzamos refresco total del template
+    const classId = `${ISSUER_ID}.V10_${safeBid}`; 
     const objectId = `${ISSUER_ID}.OBJ_${safeBid}_${safeCid}`;
 
     let cardColor = businessCardData.color || "#5234f9";
@@ -78,12 +79,13 @@ exports.generatewalletpass = onRequest({
       issuerName: bizName,
       classTemplateInfo: {
         cardBarcodeSectionDetails: {
-          // Mapeamos los módulos de texto para que aparezcan en dos columnas sobre el QR
+          // IMPORTANTE: Usamos selectores por ÍNDICE del array textModulesData
+          // Esto garantiza que Google los pinte en el frente
           firstTopDetail: {
-            fieldSelector: { fieldPath: "object.textModulesData['sellos_acumulados']" }
+            fieldSelector: { fieldPath: "object.textModulesData[0]" }
           },
           secondTopDetail: {
-            fieldSelector: { fieldPath: "object.textModulesData['premios_disponibles']" }
+            fieldSelector: { fieldPath: "object.textModulesData[1]" }
           }
         }
       }
@@ -95,17 +97,17 @@ exports.generatewalletpass = onRequest({
       hexBackgroundColor: cardColor,
       logo: logoObj,
       cardTitle: { defaultValue: { language: "es-419", value: bizName } },
-      // Estructura de la foto: Header es el nombre, Subheader es la etiqueta "Nombre"
       header: { defaultValue: { language: "es-419", value: custName } },
       subheader: { defaultValue: { language: "es-419", value: "Nombre" } },
+      // El orden aquí debe ser estricto: 0 es Sellos, 1 es Premios
       textModulesData: [
         { 
-          id: "sellos_acumulados", 
+          id: "sellos", 
           header: "Sellos acumulados", 
           body: `${stamps} sellos` 
         },
         { 
-          id: "premios_disponibles", 
+          id: "premios", 
           header: "Premios disponibles", 
           body: `${rewardsAvailable} premios` 
         }
@@ -162,11 +164,20 @@ exports.updatewalletonstampchange = onDocumentUpdated({
       const rewards = Math.floor(stamps / 10);
       const custName = (newData.name || "Cliente").substring(0, 25);
 
+      // El PATCH debe enviar el array completo en el orden correcto
       const patchData = {
         header: { defaultValue: { language: "es-419", value: custName } },
         textModulesData: [
-          { id: "sellos_acumulados", body: `${stamps} sellos` },
-          { id: "premios_disponibles", body: `${rewards} premios` }
+          { 
+            id: "sellos", 
+            header: "Sellos acumulados", 
+            body: `${stamps} sellos` 
+          },
+          { 
+            id: "premios", 
+            header: "Premios disponibles", 
+            body: `${rewards} premios` 
+          }
         ]
       };
 
@@ -187,7 +198,7 @@ exports.updatewalletonstampchange = onDocumentUpdated({
         const errorData = await response.json();
         throw new Error(JSON.stringify(errorData));
       }
-      console.log(`Pase ${objectId} actualizado con éxito.`);
+      console.log(`Pase ${objectId} actualizado con éxito a V10.`);
     } catch (error) {
       console.error("Error actualizando pase:", error.message);
     }
