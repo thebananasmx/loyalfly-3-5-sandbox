@@ -50,18 +50,17 @@ exports.generatewalletpass = onRequest({
     const customerData = customerSnap.data();
 
     const bizName = (businessCardData.name || businessMainData.name || "Loyalfly").substring(0, 20);
-    const custName = (customerData.name || "Cliente").substring(0, 20);
+    const custName = (customerData.name || "Cliente").substring(0, 25);
     const stamps = customerData.stamps || 0;
     const rewardsAvailable = Math.floor(stamps / 10);
-    const rewardText = (businessCardData.reward || "Premio").substring(0, 50);
-
+    
     const safeBid = bid.replace(/[^a-zA-Z0-9]/g, '');
     const safeCid = cid.replace(/[^a-zA-Z0-9]/g, '');
     
-    const classId = `${ISSUER_ID}.V6_${safeBid}`;
+    const classId = `${ISSUER_ID}.V7_${safeBid}`; // Incrementamos versión por cambio de estructura visual
     const objectId = `${ISSUER_ID}.OBJ_${safeBid}_${safeCid}`;
 
-    let cardColor = businessCardData.color || "#4D17FF";
+    let cardColor = businessCardData.color || "#5234f9";
     if (!cardColor.startsWith('#')) cardColor = `#${cardColor}`;
 
     let logoObj = undefined;
@@ -79,11 +78,12 @@ exports.generatewalletpass = onRequest({
       issuerName: bizName,
       classTemplateInfo: {
         cardBarcodeSectionDetails: {
+          // Mapeamos los módulos de texto para que aparezcan en dos columnas sobre el QR
           firstTopDetail: {
-            fieldSelector: { fieldPath: "object.textModulesData['customer_name']" }
+            fieldSelector: { fieldPath: "object.textModulesData['sellos_acumulados']" }
           },
           secondTopDetail: {
-            fieldSelector: { fieldPath: "object.textModulesData['rewards_count']" }
+            fieldSelector: { fieldPath: "object.textModulesData['premios_disponibles']" }
           }
         }
       }
@@ -95,17 +95,25 @@ exports.generatewalletpass = onRequest({
       hexBackgroundColor: cardColor,
       logo: logoObj,
       cardTitle: { defaultValue: { language: "es-419", value: bizName } },
-      header: { defaultValue: { language: "es-419", value: bizName } },
-      subheader: { defaultValue: { language: "es-419", value: `${stamps}/10 Sellos` } },
+      // Estructura de la foto: Header es el nombre, Subheader es la etiqueta "Nombre"
+      header: { defaultValue: { language: "es-419", value: custName } },
+      subheader: { defaultValue: { language: "es-419", value: "Nombre" } },
       textModulesData: [
-        { id: "customer_name", header: "Nombre", body: custName },
-        { id: "rewards_count", header: "Premios disponibles", body: `${rewardsAvailable} premios` },
-        { id: "reward_detail", header: "Recompensa", body: rewardText }
+        { 
+          id: "sellos_acumulados", 
+          header: "Sellos acumulados", 
+          body: `${stamps} sellos` 
+        },
+        { 
+          id: "premios_disponibles", 
+          header: "Premios disponibles", 
+          body: `${rewardsAvailable} premios` 
+        }
       ],
       barcode: {
         type: "QR_CODE",
         value: cid,
-        alternateText: `ID: ${cid.substring(0, 8)}`
+        alternateText: cid.substring(0, 8)
       }
     };
 
@@ -131,8 +139,6 @@ exports.generatewalletpass = onRequest({
 
 /**
  * FUNCIÓN 2 (v2): TRIGGER DINÁMICO
- * Eliminamos la especificación estricta de región en el trigger para que Eventarc 
- * use la ubicación de la base de datos (nam5) automáticamente.
  */
 exports.updatewalletonstampchange = onDocumentUpdated({
     document: "businesses/{bid}/customers/{cid}",
@@ -143,8 +149,7 @@ exports.updatewalletonstampchange = onDocumentUpdated({
     const newData = event.data.after.data();
     const oldData = event.data.before.data();
 
-    // Solo actuar si los sellos cambiaron
-    if (newData.stamps === oldData.stamps) return null;
+    if (newData.stamps === oldData.stamps && newData.name === oldData.name) return null;
 
     const { bid, cid } = event.params;
     const safeBid = bid.replace(/[^a-zA-Z0-9]/g, '');
@@ -155,12 +160,13 @@ exports.updatewalletonstampchange = onDocumentUpdated({
       const token = await getGoogleAuthToken();
       const stamps = newData.stamps || 0;
       const rewards = Math.floor(stamps / 10);
+      const custName = (newData.name || "Cliente").substring(0, 25);
 
       const patchData = {
-        subheader: { defaultValue: { language: "es-419", value: `${stamps}/10 Sellos` } },
+        header: { defaultValue: { language: "es-419", value: custName } },
         textModulesData: [
-          { id: "customer_name", body: (newData.name || "Cliente").substring(0, 20) },
-          { id: "rewards_count", body: `${rewards} premios` }
+          { id: "sellos_acumulados", body: `${stamps} sellos` },
+          { id: "premios_disponibles", body: `${rewards} premios` }
         ]
       };
 
@@ -177,17 +183,13 @@ exports.updatewalletonstampchange = onDocumentUpdated({
       );
 
       if (!response.ok) {
-        if (response.status === 404) {
-            console.log(`Pase ${objectId} no existe aún en Google Wallet. Ignorando update.`);
-            return null;
-        }
+        if (response.status === 404) return null;
         const errorData = await response.json();
         throw new Error(JSON.stringify(errorData));
       }
-
-      console.log(`Pase ${objectId} actualizado con éxito a ${stamps} sellos.`);
+      console.log(`Pase ${objectId} actualizado con éxito.`);
     } catch (error) {
-      console.error("Error actualizando pase vía API:", error.message);
+      console.error("Error actualizando pase:", error.message);
     }
     return null;
 });
