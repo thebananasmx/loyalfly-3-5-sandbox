@@ -57,8 +57,8 @@ exports.generatewalletpass = onRequest({
     const safeBid = bid.replace(/[^a-zA-Z0-9]/g, '');
     const safeCid = cid.replace(/[^a-zA-Z0-9]/g, '');
     
-    // CAMBIO A V12: Nueva versión para forzar actualización de diseño en Google
-    const classId = `${ISSUER_ID}.V12_${safeBid}`; 
+    // CAMBIO A V22: Nueva versión para forzar actualización de diseño en Google
+    const classId = `${ISSUER_ID}.V22_${safeBid}`; 
     const objectId = `${ISSUER_ID}.OBJ_${safeBid}_${safeCid}`;
 
     let cardColor = businessCardData.color || "#5234f9";
@@ -197,7 +197,7 @@ exports.updatewalletonstampchange = onDocumentUpdated({
         const errorData = await response.json();
         throw new Error(JSON.stringify(errorData));
       }
-      console.log(`Pase ${objectId} actualizado con éxito con nueva estructura V12.`);
+      console.log(`Pase ${objectId} actualizado con éxito con nueva estructura V22.`);
     } catch (error) {
       console.error("Error actualizando pase:", error.message);
     }
