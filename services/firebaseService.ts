@@ -1,4 +1,3 @@
-
 // FIX: Using @firebase scope for imports to ensure modular SDK type definitions are correctly resolved
 import { initializeApp } from "@firebase/app";
 import {
@@ -30,6 +29,13 @@ import {
   limit,
   startAfter,
 } from "@firebase/firestore";
+import { 
+  getStorage, 
+  ref, 
+  uploadBytes, 
+  getDownloadURL, 
+  deleteObject 
+} from "@firebase/storage";
 import type { Customer, Business, BlogPost } from '../types';
 
 const firebaseConfig = {
@@ -44,6 +50,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const storage = getStorage(app);
 
 // --- HELPERS ---
 
@@ -455,6 +462,23 @@ export const updateCustomer = async (businessId: string, customerId: string, dat
 export const deleteCustomer = async (businessId: string, customerId: string): Promise<void> => {
     const customerDocRef = doc(db, `businesses/${businessId}/customers`, customerId);
     await deleteDoc(customerDocRef);
+};
+
+// --- STORAGE FUNCTIONS ---
+
+export const uploadBusinessLogo = async (businessId: string, file: File): Promise<string> => {
+    const storageRef = ref(storage, `businesses/${businessId}/logo`);
+    await uploadBytes(storageRef, file);
+    return getDownloadURL(storageRef);
+};
+
+export const deleteBusinessLogoFile = async (businessId: string): Promise<void> => {
+    try {
+        const storageRef = ref(storage, `businesses/${businessId}/logo`);
+        await deleteObject(storageRef);
+    } catch (error) {
+        console.warn("Storage logo file not found or already deleted.");
+    }
 };
 
 // --- SUPER ADMIN AUTH & HELPERS ---

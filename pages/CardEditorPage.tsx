@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import CardPreview from '../components/CardPreview';
 import { useAuth } from '../context/AuthContext';
-import { updateCardSettings, getBusinessData } from '../services/firebaseService';
+import { updateCardSettings, getBusinessData, uploadBusinessLogo, deleteBusinessLogoFile } from '../services/firebaseService';
 import { useToast } from '../context/ToastContext';
 import { useTranslation } from 'react-i18next';
 
@@ -11,6 +11,8 @@ const CheckIconSuccess = () => <svg xmlns="http://www.w3.org/2000/svg" className
 const ExternalLinkIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>;
 const ArrowLeftIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>;
 const QRIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v1m6 11h-1m-1-6v1m-1-1h-1m-1 6h1m-1-1v1m0-1h1m4-4h1m-5 5v1m-1-1h1M4 4h4v4H4zm0 12h4v4H4zm12 0h4v4h-4zm0-12h4v4h-4z" /></svg>;
+const UploadIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>;
+const TrashIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" /></svg>;
 
 
 const CardEditorPage: React.FC = () => {
@@ -25,8 +27,11 @@ const CardEditorPage: React.FC = () => {
   const [stamps, setStamps] = useState(4);
   const [slug, setSlug] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(true);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
       document.title = 'Editor de Tarjeta | Loyalfly App';
@@ -80,6 +85,51 @@ const CardEditorPage: React.FC = () => {
     }
   };
 
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file || !user) return;
+
+      // Basic validation
+      if (!file.type.startsWith('image/')) {
+          showToast('Por favor selecciona una imagen válida.', 'error');
+          return;
+      }
+      if (file.size > 2 * 1024 * 1024) { // 2MB limit
+          showToast('La imagen es demasiado grande. El límite es 2MB.', 'error');
+          return;
+      }
+
+      setIsUploadingLogo(true);
+      try {
+          const downloadUrl = await uploadBusinessLogo(user.uid, file);
+          setLogoUrl(downloadUrl);
+          showToast('Logo subido correctamente.', 'success');
+      } catch (error) {
+          console.error("Upload error", error);
+          showToast('Error al subir el logo.', 'error');
+      } finally {
+          setIsUploadingLogo(false);
+      }
+  };
+
+  const handleDeleteLogo = async () => {
+      if (!user) return;
+      
+      const confirmDelete = window.confirm("¿Estás seguro de que quieres eliminar el logo?");
+      if (!confirmDelete) return;
+
+      try {
+          // If the URL contains our storage bucket, try to delete the file
+          if (logoUrl.includes('firebasestorage')) {
+              await deleteBusinessLogoFile(user.uid);
+          }
+          setLogoUrl('');
+          showToast('Logo eliminado del editor. No olvides guardar los cambios.', 'success');
+      } catch (error) {
+          showToast('Error al eliminar el logo.', 'error');
+      }
+  };
+
   const handleCopyUrl = () => {
     navigator.clipboard.writeText(publicCardUrl).then(() => {
         setCopied(true);
@@ -125,19 +175,63 @@ const CardEditorPage: React.FC = () => {
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-black focus:border-black"
             />
           </div>
-          <div>
-            <label htmlFor="logoUrl" className="block text-base font-medium text-gray-700 mb-1">
+          
+          <div className="space-y-4">
+            <label className="block text-base font-medium text-gray-700 mb-1">
               {t('card.logoUrlLabel')}
             </label>
-            <input
-              id="logoUrl"
-              type="url"
-              value={logoUrl}
-              onChange={(e) => setLogoUrl(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-black focus:border-black"
-              placeholder="https://ejemplo.com/logo.png"
+            
+            <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingLogo}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors disabled:opacity-50"
+                >
+                    {isUploadingLogo ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-200 border-t-black"></div>
+                    ) : (
+                        <UploadIcon />
+                    )}
+                    Subir desde dispositivo
+                </button>
+                
+                {logoUrl && (
+                    <button
+                        type="button"
+                        onClick={handleDeleteLogo}
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 border border-red-200 rounded-md shadow-sm text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
+                    >
+                        <TrashIcon />
+                        Borrar Logo
+                    </button>
+                )}
+            </div>
+            
+            <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleFileChange} 
+                accept="image/*" 
+                className="hidden" 
             />
+
+            <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span className="text-gray-400 text-sm">URL:</span>
+                </div>
+                <input
+                  id="logoUrl"
+                  type="url"
+                  value={logoUrl}
+                  onChange={(e) => setLogoUrl(e.target.value)}
+                  className="block w-full pl-12 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-black focus:border-black text-sm"
+                  placeholder="https://ejemplo.com/logo.png"
+                />
+            </div>
+            <p className="text-xs text-gray-500 italic">Puedes subir una imagen o pegar un enlace directo de una imagen (JPG/PNG).</p>
           </div>
+
           <div>
             <label htmlFor="rewardText" className="block text-base font-medium text-gray-700 mb-1">
               {t('card.rewardTextLabel')}
@@ -217,7 +311,7 @@ const CardEditorPage: React.FC = () => {
           </div>
           <button
             onClick={handleSave}
-            disabled={isSaving}
+            disabled={isSaving || isUploadingLogo}
             className="w-full py-2.5 px-4 font-semibold text-white rounded-md transition-colors bg-black hover:bg-gray-800 disabled:bg-gray-400"
           >
             {isSaving ? t('common.saving') : t('common.save')}
