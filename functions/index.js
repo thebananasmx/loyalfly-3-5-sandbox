@@ -2,6 +2,7 @@ const { onRequest } = require("firebase-functions/v2/https");
 const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const { defineSecret } = require('firebase-functions/params');
 const admin = require("firebase-admin");
+const serviceAccount = require("./service-account-key.json");
 
 // Logs de inicio para diagnóstico
 console.log("Iniciando contenedor de funciones...");
