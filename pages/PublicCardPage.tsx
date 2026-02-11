@@ -60,7 +60,6 @@ const PublicCardPage: React.FC = () => {
     const [customer, setCustomer] = useState<Customer | null>(null);
     const [surveySettings, setSurveySettings] = useState<SurveySettings | null>(null);
     const [hasVoted, setHasVoted] = useState(true);
-    const [isIOS, setIsIOS] = useState(false);
     
     // Form Inputs State
     const [phoneLookup, setPhoneLookup] = useState(''); // For the lookup form
@@ -73,10 +72,6 @@ const PublicCardPage: React.FC = () => {
     const APPLE_WALLET_URL = "https://generateapplepass-2idcsaj5va-uc.a.run.app";
 
     useEffect(() => {
-        // Detect iOS
-        const userAgent = window.navigator.userAgent.toLowerCase();
-        setIsIOS(/iphone|ipad|ipod/.test(userAgent));
-
         document.title = 'Loyalfly';
         const fetchSettings = async () => {
             if (!slug) {
@@ -222,7 +217,8 @@ const PublicCardPage: React.FC = () => {
 
     const getAppleWalletBadgeUrl = () => {
         const lang = i18n.language.split('-')[0];
-        if (lang === 'es') return 'https://res.cloudinary.com/dg4wbuppq/image/upload/v1770384873/es_add_to_apple_wallet_badge_v2_f8lsqp.png';
+        // Nueva URL proporcionada por el usuario para Español (MX)
+        if (lang === 'es') return 'https://res.cloudinary.com/dg4wbuppq/image/upload/v1770770709/ESMX_Add_to_Apple_Wallet_RGB_101821_in2cem.svg';
         if (lang === 'pt') return 'https://res.cloudinary.com/dg4wbuppq/image/upload/v1770384873/pt_add_to_apple_wallet_badge_v2_f8lsqp.png';
         return 'https://res.cloudinary.com/dg4wbuppq/image/upload/v1770384873/en_add_to_apple_wallet_badge_v2_f8lsqp.png';
     };
@@ -416,12 +412,14 @@ const PublicCardPage: React.FC = () => {
                           customerId={customer?.id}
                         />
 
-                        {/* Wallet Integration Buttons */}
-                        <div className="mt-6 flex flex-col items-center gap-3">
-                            {isIOS ? (
+                        {/* Wallet Integration Buttons - Always Show Both for maximum compatibility */}
+                        <div className="mt-8 flex flex-col items-center gap-4">
+                            <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-widest">Guarda en tu Wallet</h4>
+                            
+                            <div className="flex flex-col sm:flex-row items-center gap-4">
                                 <button 
                                     onClick={handleAddToAppleWallet}
-                                    className="transition-transform hover:scale-105 focus:outline-none"
+                                    className="transition-transform hover:scale-105 active:scale-95 focus:outline-none"
                                     aria-label={t('card.addToAppleWallet')}
                                 >
                                     <img 
@@ -430,19 +428,19 @@ const PublicCardPage: React.FC = () => {
                                         className="h-[52px] w-auto shadow-sm"
                                     />
                                 </button>
-                            ) : (
+                                
                                 <button 
                                     onClick={handleAddToGoogleWallet}
-                                    className="transition-transform hover:scale-105 focus:outline-none"
+                                    className="transition-transform hover:scale-105 active:scale-95 focus:outline-none"
                                     aria-label={t('card.addToGoogleWallet')}
                                 >
                                     <img 
                                         src={getGoogleWalletBadgeUrl()} 
                                         alt={t('card.addToGoogleWallet')}
-                                        className="h-[52px] w-auto shadow-sm rounded-lg"
+                                        className="h-[52px] w-auto shadow-sm"
                                     />
                                 </button>
-                            )}
+                            </div>
                         </div>
 
                         <button
@@ -452,7 +450,7 @@ const PublicCardPage: React.FC = () => {
                                setPhoneLookup('');
                                setErrors({});
                            }}
-                           className="mt-6 w-full py-2.5 px-4 text-base font-medium text-gray-700 bg-white border border-gray-200 rounded-md shadow-sm hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400"
+                           className="mt-10 w-full py-2.5 px-4 text-base font-medium text-gray-700 bg-white border border-gray-200 rounded-md shadow-sm hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400"
                        >
                            {t('publicView.consultOther')}
                        </button>
