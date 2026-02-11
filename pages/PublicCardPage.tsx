@@ -210,17 +210,18 @@ const PublicCardPage: React.FC = () => {
 
     const getGoogleWalletBadgeUrl = () => {
         const lang = i18n.language.split('-')[0];
-        if (lang === 'es') return 'https://res.cloudinary.com/dg4wbuppq/image/upload/v1769737296/esUS_add_to_google_wallet_wallet-button_r0kqvi.png';
-        if (lang === 'pt') return 'https://res.cloudinary.com/dg4wbuppq/image/upload/v1769737451/pt_add_to_google_wallet_wallet-button_nvp9zt.png';
-        return 'https://res.cloudinary.com/dg4wbuppq/image/upload/v1769737309/enUS_add_to_google_wallet_wallet-button_l1iikm.png';
+        // New URLs provided by the user for Google Wallet
+        if (lang === 'es') return 'https://res.cloudinary.com/dg4wbuppq/image/upload/v1770771245/esUS_add_to_google_wallet_add-wallet-badge_qmkpl1.svg';
+        if (lang === 'pt') return 'https://res.cloudinary.com/dg4wbuppq/image/upload/v1770771211/br_add_to_google_wallet_add-wallet-badge_zpnazi.svg';
+        return 'https://res.cloudinary.com/dg4wbuppq/image/upload/v1770771222/enUS_add_to_google_wallet_add-wallet-badge_lfceip.svg';
     };
 
     const getAppleWalletBadgeUrl = () => {
         const lang = i18n.language.split('-')[0];
-        // Nueva URL proporcionada por el usuario para Español (MX)
+        // URLs oficiales de Apple Wallet desde Cloudinary
         if (lang === 'es') return 'https://res.cloudinary.com/dg4wbuppq/image/upload/v1770770709/ESMX_Add_to_Apple_Wallet_RGB_101821_in2cem.svg';
-        if (lang === 'pt') return 'https://res.cloudinary.com/dg4wbuppq/image/upload/v1770384873/pt_add_to_apple_wallet_badge_v2_f8lsqp.png';
-        return 'https://res.cloudinary.com/dg4wbuppq/image/upload/v1770384873/en_add_to_apple_wallet_badge_v2_f8lsqp.png';
+        if (lang === 'pt') return 'https://res.cloudinary.com/dg4wbuppq/image/upload/v1770770808/PT_Add_to_Apple_Wallet_RGB_102021_m9ggwe.svg';
+        return 'https://res.cloudinary.com/dg4wbuppq/image/upload/v1770770828/US-UK_Add_to_Apple_Wallet_RGB_101421_hkprrj.svg';
     };
     
     const renderContent = () => {
