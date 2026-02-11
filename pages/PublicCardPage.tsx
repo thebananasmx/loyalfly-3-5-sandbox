@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import CardPreview from '../components/CardPreview';
@@ -61,6 +60,7 @@ const PublicCardPage: React.FC = () => {
     const [customer, setCustomer] = useState<Customer | null>(null);
     const [surveySettings, setSurveySettings] = useState<SurveySettings | null>(null);
     const [hasVoted, setHasVoted] = useState(true);
+    const [isIOS, setIsIOS] = useState(false);
     
     // Form Inputs State
     const [phoneLookup, setPhoneLookup] = useState(''); // For the lookup form
@@ -68,10 +68,15 @@ const PublicCardPage: React.FC = () => {
     const [userPhone, setUserPhone] = useState('');
     const [userEmail, setUserEmail] = useState('');
 
-    // Google Wallet Cloud Function Base URL - UPDATED TO USER PROVIDED URL
-    const WALLET_FUNCTION_URL = "https://generatewalletpass-2idcsaj5va-uc.a.run.app";
+    // Cloud Function Base URLs
+    const GOOGLE_WALLET_URL = "https://generatewalletpass-2idcsaj5va-uc.a.run.app";
+    const APPLE_WALLET_URL = "https://generateapplepass-2idcsaj5va-uc.a.run.app";
 
     useEffect(() => {
+        // Detect iOS
+        const userAgent = window.navigator.userAgent.toLowerCase();
+        setIsIOS(/iphone|ipad|ipod/.test(userAgent));
+
         document.title = 'Loyalfly';
         const fetchSettings = async () => {
             if (!slug) {
@@ -198,22 +203,28 @@ const PublicCardPage: React.FC = () => {
         }
     };
 
-    const handleAddToWallet = () => {
+    const handleAddToGoogleWallet = () => {
         if (!businessId || !customer) return;
-        window.location.href = `${WALLET_FUNCTION_URL}?bid=${businessId}&cid=${customer.id}`;
+        window.location.href = `${GOOGLE_WALLET_URL}?bid=${businessId}&cid=${customer.id}`;
     };
 
-    // Helper to get the correct localized badge from Cloudinary provided assets
-    const getWalletBadgeUrl = () => {
+    const handleAddToAppleWallet = () => {
+        if (!businessId || !customer) return;
+        window.location.href = `${APPLE_WALLET_URL}?bid=${businessId}&cid=${customer.id}`;
+    };
+
+    const getGoogleWalletBadgeUrl = () => {
         const lang = i18n.language.split('-')[0];
-        if (lang === 'es') {
-            return 'https://res.cloudinary.com/dg4wbuppq/image/upload/v1769737296/esUS_add_to_google_wallet_wallet-button_r0kqvi.png';
-        }
-        if (lang === 'pt') {
-            return 'https://res.cloudinary.com/dg4wbuppq/image/upload/v1769737451/pt_add_to_google_wallet_wallet-button_nvp9zt.png';
-        }
-        // Default to English
+        if (lang === 'es') return 'https://res.cloudinary.com/dg4wbuppq/image/upload/v1769737296/esUS_add_to_google_wallet_wallet-button_r0kqvi.png';
+        if (lang === 'pt') return 'https://res.cloudinary.com/dg4wbuppq/image/upload/v1769737451/pt_add_to_google_wallet_wallet-button_nvp9zt.png';
         return 'https://res.cloudinary.com/dg4wbuppq/image/upload/v1769737309/enUS_add_to_google_wallet_wallet-button_l1iikm.png';
+    };
+
+    const getAppleWalletBadgeUrl = () => {
+        const lang = i18n.language.split('-')[0];
+        if (lang === 'es') return 'https://res.cloudinary.com/dg4wbuppq/image/upload/v1770384873/es_add_to_apple_wallet_badge_v2_f8lsqp.png';
+        if (lang === 'pt') return 'https://res.cloudinary.com/dg4wbuppq/image/upload/v1770384873/pt_add_to_apple_wallet_badge_v2_f8lsqp.png';
+        return 'https://res.cloudinary.com/dg4wbuppq/image/upload/v1770384873/en_add_to_apple_wallet_badge_v2_f8lsqp.png';
     };
     
     const renderContent = () => {
@@ -405,23 +416,33 @@ const PublicCardPage: React.FC = () => {
                           customerId={customer?.id}
                         />
 
-                        {/* Google Wallet Integration Button */}
-                        <div className="mt-6 flex flex-col items-center">
-                            <button 
-                                onClick={handleAddToWallet}
-                                className="transition-transform hover:scale-105 focus:outline-none"
-                                aria-label={t('card.addToWallet')}
-                            >
-                                <img 
-                                    src={getWalletBadgeUrl()} 
-                                    alt={t('card.addToWallet')}
-                                    className="h-[52px] w-auto shadow-sm rounded-lg"
-                                    onError={(e) => {
-                                        // Simple fallback if cloudinary fails
-                                        (e.target as HTMLImageElement).src = 'https://developers.google.com/static/wallet/images/badges/en_US_add_to_google_wallet_wallet-badge.png';
-                                    }}
-                                />
-                            </button>
+                        {/* Wallet Integration Buttons */}
+                        <div className="mt-6 flex flex-col items-center gap-3">
+                            {isIOS ? (
+                                <button 
+                                    onClick={handleAddToAppleWallet}
+                                    className="transition-transform hover:scale-105 focus:outline-none"
+                                    aria-label={t('card.addToAppleWallet')}
+                                >
+                                    <img 
+                                        src={getAppleWalletBadgeUrl()} 
+                                        alt={t('card.addToAppleWallet')}
+                                        className="h-[52px] w-auto shadow-sm"
+                                    />
+                                </button>
+                            ) : (
+                                <button 
+                                    onClick={handleAddToGoogleWallet}
+                                    className="transition-transform hover:scale-105 focus:outline-none"
+                                    aria-label={t('card.addToGoogleWallet')}
+                                >
+                                    <img 
+                                        src={getGoogleWalletBadgeUrl()} 
+                                        alt={t('card.addToGoogleWallet')}
+                                        className="h-[52px] w-auto shadow-sm rounded-lg"
+                                    />
+                                </button>
+                            )}
                         </div>
 
                         <button
