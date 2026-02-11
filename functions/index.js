@@ -2,45 +2,43 @@ const { onRequest } = require("firebase-functions/v2/https");
 const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
 const { defineSecret } = require('firebase-functions/params');
 const admin = require("firebase-admin");
-const jwt = require("jsonwebtoken");
-const { GoogleAuth } = require("google-auth-library");
-const { PKPass } = require("passkit-generator");
-const serviceAccount = require("./service-account-key.json");
 
-// Definición de secretos (deben estar en Secret Manager)
+// Logs de inicio para diagnóstico
+console.log("Iniciando contenedor de funciones...");
+
+// Definición de secretos (Deben existir en Secret Manager)
 const APPLE_PASS_CERT = defineSecret('APPLE_PASS_CERT_BASE64');
 const APPLE_PASS_PASSWORD = defineSecret('APPLE_PASS_PASSWORD');
-const APPLE_WWDR_CERT = defineSecret('APPLE_WWDR_CERT_BASE64'); // Certificado intermedio de Apple
+const APPLE_WWDR_CERT = defineSecret('APPLE_WWDR_CERT_BASE64');
 
-admin.initializeApp();
+// Inicialización limpia
+try {
+    admin.initializeApp();
+    console.log("Firebase Admin inicializado correctamente.");
+} catch (e) {
+    console.error("Error inicializando Firebase Admin:", e);
+}
+
 const db = admin.firestore();
-
 const ISSUER_ID = "3388000000023072020";
 
-/**
- * Obtiene un token de acceso OAuth2 para la API de Google Wallet
- */
-async function getGoogleAuthToken() {
-  const auth = new GoogleAuth({
-    credentials: {
-      client_email: serviceAccount.client_email,
-      private_key: serviceAccount.private_key.replace(/\\n/g, '\n'),
-    },
-    scopes: ["https://www.googleapis.com/auth/wallet_object.issuer"],
-  });
-  const client = await auth.getClient();
-  const token = await client.getAccessToken();
-  return token.token;
-}
+// Carga diferida de librerías pesadas para evitar timeout en el arranque
+let GoogleAuth;
+let PKPass;
 
 /**
  * FUNCIÓN 1: Generación de Pase Google Wallet (JWT)
  */
 exports.generatewalletpass = onRequest({ 
     region: "us-central1", 
-    memory: "256MiB",
+    memory: "512MiB",
     maxInstances: 10 
 }, async (req, res) => {
+  if (!GoogleAuth) {
+    const authLib = require("google-auth-library");
+    GoogleAuth = authLib.GoogleAuth;
+  }
+  
   const { bid, cid } = req.query;
   if (!bid || !cid) return res.status(400).send("Faltan parámetros.");
 
@@ -123,18 +121,7 @@ exports.generatewalletpass = onRequest({
       }
     };
 
-    const claims = {
-      iss: serviceAccount.client_email,
-      aud: "google",
-      typ: "savetowallet",
-      payload: {
-        genericClasses: [genericClass],
-        genericObjects: [genericObject],
-      },
-    };
-
-    const token = jwt.sign(claims, serviceAccount.private_key.replace(/\\n/g, '\n'), { algorithm: "RS256" });
-    res.redirect(`https://pay.google.com/gp/v/save/${token}`);
+    res.status(500).send("La firma del JWT de Google Wallet requiere configuración de llave privada en Secret Manager.");
 
   } catch (error) {
     res.status(500).send("Error: " + error.message);
@@ -146,18 +133,23 @@ exports.generatewalletpass = onRequest({
  */
 exports.generateapplepass = onRequest({
     region: "us-central1",
-    memory: "256MiB",
-    secrets: [APPLE_PASS_CERT, APPLE_PASS_PASSWORD]
+    memory: "1GiB", 
+    secrets: [APPLE_PASS_CERT, APPLE_PASS_PASSWORD, APPLE_WWDR_CERT]
 }, async (req, res) => {
+    if (!PKPass) {
+        const passLib = require("passkit-generator");
+        PKPass = passLib.PKPass;
+    }
+
     const { bid, cid } = req.query;
     if (!bid || !cid) return res.status(400).send("Faltan parámetros.");
 
     try {
+        const customerSnap = await db.doc(`businesses/${bid}/customers/${cid}`).get();
+        if (!customerSnap.exists) return res.status(404).send("Cliente no encontrado.");
+
         const businessCardSnap = await db.doc(`businesses/${bid}/config/card`).get();
         const businessMainSnap = await db.doc(`businesses/${bid}`).get();
-        const customerSnap = await db.doc(`businesses/${bid}/customers/${cid}`).get();
-
-        if (!customerSnap.exists) return res.status(404).send("Cliente no encontrado.");
 
         const cardData = businessCardSnap.data() || {};
         const mainData = businessMainSnap.data() || {};
@@ -167,22 +159,20 @@ exports.generateapplepass = onRequest({
         const stamps = custData.stamps || 0;
         const rewards = Math.floor(stamps / 10);
 
-        // Crear instancia del pase
         const pass = new PKPass({
-            model: null, // Puedes crear un .pass folder en el repo con iconos fijos
+            model: null,
             certificates: {
-                wwdr: Buffer.from(APPLE_WWDR_CERT.value(), 'base64'), // Necesitas subir este también
+                wwdr: Buffer.from(APPLE_WWDR_CERT.value(), 'base64'),
                 signerCert: Buffer.from(APPLE_PASS_CERT.value(), 'base64'),
                 signerKeyPassphrase: APPLE_PASS_PASSWORD.value(),
             }
         });
 
-        // Configuración visual
         pass.setPackDetails({
             formatVersion: 1,
-            passTypeIdentifier: "pass.com.loyalfly.stamps",
+            passTypeIdentifier: "pass.com.loyalfly.card",
             serialNumber: cid,
-            teamIdentifier: "YOUR_TEAM_ID", // Tu ID de equipo de Apple
+            teamIdentifier: "KWQ7439H65",
             organizationName: bizName,
             description: `Lealtad ${bizName}`,
             backgroundColor: cardData.color || "rgb(81, 52, 249)",
@@ -207,8 +197,8 @@ exports.generateapplepass = onRequest({
         res.status(200).send(buffer);
 
     } catch (error) {
-        console.error("APPLE PASS ERROR:", error);
-        res.status(500).send("No se pudo generar el pase. Verifica certificados.");
+        console.error("APPLE PASS GENERATION ERROR:", error);
+        res.status(500).send("Error generando pase: " + error.message);
     }
 });
 
@@ -218,7 +208,7 @@ exports.generateapplepass = onRequest({
 exports.updatewalletonstampchange = onDocumentUpdated({
     document: "businesses/{bid}/customers/{cid}",
     retry: true,
-    memory: "256MiB"
+    memory: "512MiB"
 }, async (event) => {
     const newData = event.data.after.data();
     const oldData = event.data.before.data();
@@ -229,7 +219,13 @@ exports.updatewalletonstampchange = onDocumentUpdated({
     const objectId = `${ISSUER_ID}.OBJ_${safeBid}_${cid.replace(/[^a-zA-Z0-9]/g, '')}`;
 
     try {
-      const token = await getGoogleAuthToken();
+      const authLib = require("google-auth-library");
+      const auth = new authLib.GoogleAuth({
+        scopes: ["https://www.googleapis.com/auth/wallet_object.issuer"],
+      });
+      const client = await auth.getClient();
+      const token = (await client.getAccessToken()).token;
+
       const stamps = newData.stamps || 0;
       const rewards = Math.floor(stamps / 10);
       const custName = (newData.name || "Cliente").substring(0, 25);
