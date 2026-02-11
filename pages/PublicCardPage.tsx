@@ -414,9 +414,7 @@ const PublicCardPage: React.FC = () => {
                         />
 
                         {/* Wallet Integration Buttons - Always Show Both for maximum compatibility */}
-                        <div className="mt-8 flex flex-col items-center gap-4">
-                            <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-widest">Guarda en tu Wallet</h4>
-                            
+                        <div className="mt-8 flex justify-center">
                             <div className="flex flex-col sm:flex-row items-center gap-4">
                                 <button 
                                     onClick={handleAddToAppleWallet}
