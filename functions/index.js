@@ -1,4 +1,3 @@
-
 import { onRequest } from "firebase-functions/v2/https";
 import { onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { defineSecret } from "firebase-functions/params";
@@ -119,7 +118,7 @@ export const generateapplepass = onRequest({
         console.log(`Intentando crear PKPass con WWDR PEM (L:${wwdrPEM.length}) y Signer Buffer (L:${signerBuffer.length})`);
 
         const pass = new PKPass(certificates, {
-            passTypeIdentifier: "pass.com.loyalfly.loyalty",
+            passTypeIdentifier: "pass.com.loyalfly.card",
             teamIdentifier: "8W9R78X846",
             organizationName: bizName,
             serialNumber: cid,
