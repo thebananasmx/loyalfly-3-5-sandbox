@@ -1,7 +1,9 @@
+
 {
   "name": "functions",
   "description": "Cloud Functions para Loyalfly Wallet Passes",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "serve": "firebase serve --only functions",
     "shell": "firebase functions:shell",

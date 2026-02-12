@@ -1,12 +1,37 @@
 
-const { onRequest } = require("firebase-functions/v2/https");
-const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
-const { defineSecret } = require("firebase-functions/params");
-const admin = require("firebase-admin");
-const jwt = require("jsonwebtoken");
-const { GoogleAuth } = require("google-auth-library");
-const { PKPass } = require("passkit-generator");
-const serviceAccount = require("./service-account-key.json");
+import { onRequest } from "firebase-functions/v2/https";
+import { onDocumentUpdated } from "firebase-functions/v2/firestore";
+import { defineSecret } from "firebase-functions/params";
+import admin from "firebase-admin";
+import jwt from "jsonwebtoken";
+import { GoogleAuth } from "google-auth-library";
+import { PKPass } from "passkit-generator";
+import { readFileSync, existsSync } from "fs";
+import { fileURLToPath } from "url";
+import path from "path";
+
+// Configuración de rutas para ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Carga segura de Service Account
+let serviceAccount = null;
+const saPath = path.join(__dirname, "service-account-key.json");
+
+function loadServiceAccount() {
+  if (serviceAccount) return serviceAccount;
+  try {
+    if (existsSync(saPath)) {
+      serviceAccount = JSON.parse(readFileSync(saPath, "utf8"));
+      return serviceAccount;
+    } else {
+      console.warn("ADVERTENCIA: service-account-key.json no encontrado en:", saPath);
+    }
+  } catch (err) {
+    console.error("ERROR cargando service-account-key.json:", err.message);
+  }
+  return null;
+}
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -18,14 +43,13 @@ const APPLE_WWDR_CERT_BASE64 = defineSecret("APPLE_WWDR_CERT_BASE64");
 
 const ISSUER_ID = "3388000000023072020";
 
-/**
- * Obtiene un token de acceso OAuth2 para la API de Google Wallet
- */
 async function getGoogleAuthToken() {
+  const sa = loadServiceAccount();
+  if (!sa) throw new Error("Service Account no configurada.");
   const auth = new GoogleAuth({
     credentials: {
-      client_email: serviceAccount.client_email,
-      private_key: serviceAccount.private_key.replace(/\\n/g, '\n'),
+      client_email: sa.client_email,
+      private_key: sa.private_key.replace(/\\n/g, '\n'),
     },
     scopes: ["https://www.googleapis.com/auth/wallet_object.issuer"],
   });
@@ -37,11 +61,11 @@ async function getGoogleAuthToken() {
 /**
  * FUNCIÓN: Generación de Pase para Apple Wallet (.pkpass)
  */
-exports.generateapplepass = onRequest({
+export const generateapplepass = onRequest({
     region: "us-central1",
-    memory: "256MiB",
+    memory: "512MiB",
     maxInstances: 10,
-    invoker: "public",
+    // Nota: Si el deploy sigue fallando aquí, asegúrate de que los secretos existan en la consola de Google Cloud.
     secrets: [APPLE_PASS_CERT_BASE64, APPLE_PASS_PASSWORD, APPLE_WWDR_CERT_BASE64]
 }, async (req, res) => {
     const { bid, cid } = req.query;
@@ -65,16 +89,15 @@ exports.generateapplepass = onRequest({
         let cardColor = businessCardData.color || "#5134f9";
         if (!cardColor.startsWith('#')) cardColor = `#${cardColor}`;
 
-        // Limpiar y cargar certificados
-        const wwdrRaw = APPLE_WWDR_CERT_BASE64.value().replace(/\s/g, '');
-        const signerRaw = APPLE_PASS_CERT_BASE64.value().replace(/\s/g, '');
+        // Obtener valores de secretos de forma segura
+        const wwdrRaw = (APPLE_WWDR_CERT_BASE64.value() || "").replace(/\s/g, '');
+        const signerRaw = (APPLE_PASS_CERT_BASE64.value() || "").replace(/\s/g, '');
         const password = APPLE_PASS_PASSWORD.value();
 
-        if (!wwdrRaw || wwdrRaw.length < 10) {
-            throw new Error("El secreto APPLE_WWDR_CERT_BASE64 parece estar vacío o mal configurado.");
+        if (!wwdrRaw || !signerRaw) {
+            throw new Error("Certificados no disponibles. Verifica los secretos en la consola.");
         }
 
-        // PKPass v3 Constructor
         const pass = new PKPass({
             wwdr: Buffer.from(wwdrRaw, "base64"),
             signerCert: Buffer.from(signerRaw, "base64"),
@@ -82,39 +105,18 @@ exports.generateapplepass = onRequest({
             signerKeyPassphrase: password,
         }, {
             passTypeIdentifier: "pass.com.loyalfly.loyalty", 
-            teamIdentifier: "8W9R78X846", // DEBES ASEGURARTE QUE ESTE SEA TU TEAM ID REAL
+            teamIdentifier: "8W9R78X846", 
             organizationName: bizName,
             serialNumber: cid,
             sharingProhibited: true
         });
 
         pass.type = "storeCard";
-        
         pass.headerFields.add({ key: "logoText", value: "Loyalfly" });
-        
-        pass.primaryFields.add({ 
-            key: "bizName", 
-            label: "NEGOCIO", 
-            value: bizName 
-        });
-        
-        pass.secondaryFields.add({ 
-            key: "customerName", 
-            label: "CLIENTE", 
-            value: customerData.name || "Invitado" 
-        });
-        
-        pass.auxiliaryFields.add({ 
-            key: "stamps", 
-            label: "SELLOS", 
-            value: `${stamps}` 
-        });
-        
-        pass.auxiliaryFields.add({ 
-            key: "rewards", 
-            label: "PREMIOS", 
-            value: `${rewards}` 
-        });
+        pass.primaryFields.add({ key: "bizName", label: "NEGOCIO", value: bizName });
+        pass.secondaryFields.add({ key: "customerName", label: "CLIENTE", value: customerData.name || "Invitado" });
+        pass.auxiliaryFields.add({ key: "stamps", label: "SELLOS", value: `${stamps}` });
+        pass.auxiliaryFields.add({ key: "rewards", label: "PREMIOS", value: `${rewards}` });
 
         pass.setBarcodes({
             format: "PKBarcodeFormatQR",
@@ -124,8 +126,7 @@ exports.generateapplepass = onRequest({
         });
 
         pass.setBackgroundColor(cardColor);
-        const isDarkText = businessCardData.textColorScheme === 'dark';
-        const colorString = isDarkText ? "rgb(0,0,0)" : "rgb(255,255,255)";
+        const colorString = businessCardData.textColorScheme === 'dark' ? "rgb(0,0,0)" : "rgb(255,255,255)";
         pass.setLabelColor(colorString);
         pass.setForegroundColor(colorString);
 
@@ -137,23 +138,25 @@ exports.generateapplepass = onRequest({
 
     } catch (error) {
         console.error("ERROR GENERATE APPLE PASS:", error);
-        res.status(500).send("Error de generación Apple Pass: " + error.message);
+        res.status(500).send("Error de servidor: No se pudo generar el pase de Apple.");
     }
 });
 
 /**
  * FUNCIÓN: Generación del Pase Google Wallet (JWT)
  */
-exports.generatewalletpass = onRequest({ 
+export const generatewalletpass = onRequest({ 
     region: "us-central1", 
     memory: "256MiB",
-    invoker: "public",
     maxInstances: 10 
 }, async (req, res) => {
   const { bid, cid } = req.query;
   if (!bid || !cid) return res.status(400).send("Faltan parámetros bid o cid.");
 
   try {
+    const sa = loadServiceAccount();
+    if (!sa) throw new Error("Configuración de servidor incompleta (SA missing).");
+    
     const businessCardSnap = await db.doc(`businesses/${bid}/config/card`).get();
     const businessMainSnap = await db.doc(`businesses/${bid}`).get();
     const customerSnap = await db.doc(`businesses/${bid}/customers/${cid}`).get();
@@ -198,20 +201,12 @@ exports.generatewalletpass = onRequest({
               twoItems: {
                 startItem: {
                   firstValue: {
-                    fields: [
-                      {
-                        fieldPath: "object.textModulesData['sellos']"
-                      }
-                    ]
+                    fields: [{ fieldPath: "object.textModulesData['sellos']" }]
                   }
                 },
                 endItem: {
                   firstValue: {
-                    fields: [
-                      {
-                        fieldPath: "object.textModulesData['recompensas']"
-                      }
-                    ]
+                    fields: [{ fieldPath: "object.textModulesData['recompensas']" }]
                   }
                 }
               }
@@ -230,16 +225,8 @@ exports.generatewalletpass = onRequest({
       header: { defaultValue: { language: "es-419", value: `${custName}` } },
       subheader: { defaultValue: { language: "es-419", value: `Nombre` } },
       textModulesData: [
-        { 
-          id: "sellos", 
-          header: "Sellos acumulados", 
-          body: `${stamps}` 
-        },
-        { 
-          id: "recompensas", 
-          header: "Recompensas", 
-          body: `${rewardsAvailable}` 
-        }
+        { id: "sellos", header: "Sellos acumulados", body: `${stamps}` },
+        { id: "recompensas", header: "Recompensas", body: `${rewardsAvailable}` }
       ],
       barcode: {
         type: "QR_CODE",
@@ -249,7 +236,7 @@ exports.generatewalletpass = onRequest({
     };
 
     const claims = {
-      iss: serviceAccount.client_email,
+      iss: sa.client_email,
       aud: "google",
       typ: "savetowallet",
       payload: {
@@ -258,24 +245,25 @@ exports.generatewalletpass = onRequest({
       },
     };
 
-    const token = jwt.sign(claims, serviceAccount.private_key.replace(/\\n/g, '\n'), { algorithm: "RS256" });
+    const token = jwt.sign(claims, sa.private_key.replace(/\\n/g, '\n'), { algorithm: "RS256" });
     res.redirect(`https://pay.google.com/gp/v/save/${token}`);
 
   } catch (error) {
     console.error("ERROR GENERATE WALLET:", error);
-    res.status(500).send("Error de generación Google Wallet: " + error.message);
+    res.status(500).send("Error de servidor: Verifica la configuración de la cuenta de servicio.");
   }
 });
 
 /**
  * TRIGGER: Actualización en tiempo real para Google Wallet
  */
-exports.updatewalletonstampchange = onDocumentUpdated({
+export const updatewalletonstampchange = onDocumentUpdated({
     document: "businesses/{bid}/customers/{cid}",
     retry: true,
     memory: "256MiB",
     maxInstances: 5
 }, async (event) => {
+    if (!loadServiceAccount()) return null;
     const newData = event.data.after.data();
     const oldData = event.data.before.data();
 
@@ -296,16 +284,8 @@ exports.updatewalletonstampchange = onDocumentUpdated({
         header: { defaultValue: { language: "es-419", value: `${custName}` } },
         subheader: { defaultValue: { language: "es-419", value: `Nombre` } },
         textModulesData: [
-          { 
-            id: "sellos", 
-            header: "Sellos acumulados", 
-            body: `${stamps}` 
-          },
-          { 
-            id: "recompensas", 
-            header: "Recompensas", 
-            body: `${rewards}` 
-          }
+          { id: "sellos", header: "Sellos acumulados", body: `${stamps}` },
+          { id: "recompensas", header: "Recompensas", body: `${rewards}` }
         ]
       };
 
@@ -326,7 +306,7 @@ exports.updatewalletonstampchange = onDocumentUpdated({
         const errorData = await response.json();
         throw new Error(JSON.stringify(errorData));
       }
-      console.log(`Pase Google ${objectId} actualizado con éxito.`);
+      console.log(`Pase Google ${objectId} actualizado.`);
     } catch (error) {
       console.error("Error actualizando pase Google:", error.message);
     }
