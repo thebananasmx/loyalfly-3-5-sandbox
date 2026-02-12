@@ -86,39 +86,46 @@ export const generateapplepass = onRequest({
         let cardColor = businessCardData.color || "#5134f9";
         if (!cardColor.startsWith('#')) cardColor = `#${cardColor}`;
 
-        // LIMPIEZA DE SECRETOS: Solo quitamos espacios y saltos de línea comunes
-        // Si el usuario pegó el Base64, esto lo deja limpio.
-        const cleanBase64 = (val) => (val || "").replace(/[\s\n\r\t]/g, '');
+        // LIMPIEZA Y FORMATEO PEM
+        const cleanStr = (val) => (val || "").replace(/[\s\n\r\t]/g, '').trim();
         
-        const wwdrRaw = cleanBase64(APPLE_WWDR_CERT_BASE64.value());
-        const signerRaw = cleanBase64(APPLE_PASS_CERT_BASE64.value());
-        const password = APPLE_PASS_PASSWORD.value();
+        const wwdrBase64 = cleanStr(APPLE_WWDR_CERT_BASE64.value());
+        const signerBase64 = cleanStr(APPLE_PASS_CERT_BASE64.value());
+        const password = cleanStr(APPLE_PASS_PASSWORD.value());
 
-        // Diagnóstico en Logs (Ayuda a saber si el secreto llegó vacío)
-        console.log(`Diagnóstico Apple Pass: WWDR Len: ${wwdrRaw.length}, Signer Len: ${signerRaw.length}`);
-
-        if (wwdrRaw.length < 10 || signerRaw.length < 10) {
-            throw new Error("Uno de los certificados en Secret Manager parece estar vacío o ser demasiado corto.");
+        if (!wwdrBase64 || !signerBase64) {
+            throw new Error("Certificados no encontrados en Secret Manager.");
         }
 
-        const wwdrBuffer = Buffer.from(wwdrRaw, "base64");
-        const signerBuffer = Buffer.from(signerRaw, "base64");
+        // Convertir WWDR a PEM (Muchas librerías lo prefieren así sobre el binario puro)
+        const wwdrPEM = `-----BEGIN CERTIFICATE-----\n${wwdrBase64}\n-----END CERTIFICATE-----`;
+        
+        // El Signer puede ser un .p12 (binario) o un PEM. 
+        // Si el usuario subió un .p12, no debemos envolverlo en PEM.
+        // Lo trataremos como Buffer.
+        const signerBuffer = Buffer.from(signerBase64, "base64");
 
-        // PKPass Constructor (v3 API)
-        const pass = new PKPass({
-            wwdr: wwdrBuffer,
+        // Construcción explícita del objeto de certificados
+        const certificates = {
+            wwdr: wwdrPEM,
             signerCert: signerBuffer,
-            signerKey: signerBuffer, 
-            signerKeyPassphrase: password,
-        }, {
-            passTypeIdentifier: "pass.com.loyalfly.loyalty", 
-            teamIdentifier: "8W9R78X846", 
+            signerKey: signerBuffer
+        };
+
+        if (password) {
+            certificates.signerKeyPassphrase = password;
+        }
+
+        console.log(`Intentando crear PKPass con WWDR PEM (L:${wwdrPEM.length}) y Signer Buffer (L:${signerBuffer.length})`);
+
+        const pass = new PKPass(certificates, {
+            passTypeIdentifier: "pass.com.loyalfly.loyalty",
+            teamIdentifier: "8W9R78X846",
             organizationName: bizName,
             serialNumber: cid,
             sharingProhibited: true
         });
 
-        // Configuración de campos (v3 usa .push en lugar de .add)
         pass.type = "storeCard";
         pass.headerFields.push({ key: "logoText", value: "Loyalfly" });
         pass.primaryFields.push({ key: "bizName", label: "NEGOCIO", value: bizName });
@@ -126,7 +133,6 @@ export const generateapplepass = onRequest({
         pass.auxiliaryFields.push({ key: "stamps", label: "SELLOS", value: `${stamps}` });
         pass.auxiliaryFields.push({ key: "rewards", label: "PREMIOS", value: `${rewards}` });
 
-        // Barcodes (v3 API es una propiedad)
         pass.barcodes = [{
             format: "PKBarcodeFormatQR",
             message: cid,
@@ -134,7 +140,6 @@ export const generateapplepass = onRequest({
             altText: customerData.phone || cid.substring(0, 8)
         }];
 
-        // Estilos
         pass.backgroundColor = cardColor;
         const colorString = businessCardData.textColorScheme === 'dark' ? "rgb(0,0,0)" : "rgb(255,255,255)";
         pass.labelColor = colorString;
@@ -148,11 +153,7 @@ export const generateapplepass = onRequest({
 
     } catch (error) {
         console.error("ERROR GENERATE APPLE PASS:", error);
-        // Si es un error de validación de la librería, damos más detalle
-        const detail = error.message.includes("ValidationError") ? 
-            "Error de certificados: Asegúrate de que APPLE_WWDR_CERT_BASE64 y APPLE_PASS_CERT_BASE64 sean Base64 válidos de archivos .pem o .p12." : 
-            error.message;
-        res.status(500).send(`Error de servidor: ${detail}`);
+        res.status(500).send(`Error generando pase Apple: ${error.message}`);
     }
 });
 
