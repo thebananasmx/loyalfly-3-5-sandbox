@@ -40,33 +40,42 @@ const APPLE_WWDR_CERT_BASE64 = defineSecret("APPLE_WWDR_CERT_BASE64");
 const ISSUER_ID = "3388000000023072020";
 
 /**
- * Procesa el input de Secret Manager.
- * Detecta si es PEM (String) o Binario (Buffer).
+ * Procesa certificados con limpieza profunda.
+ * Siempre devuelve un Buffer para máxima compatibilidad con Node crypto.
  */
 function processCertificate(raw, name) {
     if (!raw) {
-        console.error(`DIAGNÓSTICO: El secreto ${name} está VACÍO.`);
+        console.error(`ERROR: El secreto ${name} no tiene valor.`);
         return null;
     }
-    
-    // 1. Limpieza de caracteres de control y comillas
-    let cleaned = raw.trim().replace(/^['"]|['"]$/g, '');
-    cleaned = cleaned.replace(/\\n/g, '\n');
 
-    // 2. Log de seguridad (inicio y fin) para detectar truncado
-    console.log(`DIAGNÓSTICO ${name}: [${cleaned.substring(0, 20)}...${cleaned.substring(cleaned.length - 20)}] Longitud: ${cleaned.length}`);
+    // 1. Limpieza de comillas, espacios extremos y saltos de línea literales
+    let cleaned = raw.toString().trim()
+        .replace(/^['"]|['"]$/g, '')
+        .replace(/\\n/g, '\n');
 
-    // 3. Si es PEM, la librería espera el STRING, no un Buffer.
+    // 2. Si parece PEM (Texto), lo convertimos a Buffer directamente
     if (cleaned.includes("-----BEGIN")) {
-        return cleaned; 
+        console.log(`INFO ${name}: Detectado como PEM (Texto). Longitud: ${cleaned.length}`);
+        return Buffer.from(cleaned, "utf-8");
     }
-    
-    // 4. Si no es PEM, es Base64 binario (.p12 o .cer). Devolvemos Buffer.
+
+    // 3. Si no es PEM, intentamos tratarlo como Base64 (posible binario .cer o .p12)
     try {
-        return Buffer.from(cleaned, "base64");
+        const buffer = Buffer.from(cleaned, "base64");
+        
+        // Verificamos si el contenido decodificado es en realidad un PEM
+        const decodedString = buffer.toString("utf-8");
+        if (decodedString.includes("-----BEGIN")) {
+            console.log(`INFO ${name}: Detectado como PEM dentro de Base64.`);
+            return buffer; 
+        }
+
+        console.log(`INFO ${name}: Detectado como Binario (Base64). Longitud: ${buffer.length}`);
+        return buffer;
     } catch (e) {
-        console.error(`Error procesando binario en ${name}:`, e.message);
-        return null;
+        console.error(`ERROR ${name}: No se pudo procesar como Base64.`, e.message);
+        return Buffer.from(cleaned, "utf-8");
     }
 }
 
@@ -92,15 +101,16 @@ export const generateapplepass = onRequest({
     if (!bid || !cid) return res.status(400).send("Faltan parámetros bid o cid.");
 
     try {
-        // 1. Extraer y procesar (Devuelve String para PEM, Buffer para binario)
+        // 1. Procesar certificados
         const wwdr = processCertificate(APPLE_WWDR_CERT_BASE64.value(), "WWDR");
         const signer = processCertificate(APPLE_PASS_CERT_BASE64.value(), "SIGNER");
-        const password = APPLE_PASS_PASSWORD.value()?.trim().replace(/^['"]|['"]$/g, '');
+        const password = APPLE_PASS_PASSWORD.value()?.toString().trim().replace(/^['"]|['"]$/g, '');
 
-        if (!wwdr) throw new Error("Certificado WWDR no encontrado o inválido.");
-        if (!signer) throw new Error("Certificado SIGNER no encontrado o inválido.");
+        // Validación manual antes de entrar a la librería
+        if (!wwdr || wwdr.length === 0) throw new Error("Certificado WWDR inválido o vacío.");
+        if (!signer || signer.length === 0) throw new Error("Certificado SIGNER inválido o vacío.");
 
-        // 2. Obtener datos de Firestore
+        // 2. Datos de Firestore
         const businessCardSnap = await db.doc(`businesses/${bid}/config/card`).get();
         const businessMainSnap = await db.doc(`businesses/${bid}`).get();
         const customerSnap = await db.doc(`businesses/${bid}/customers/${cid}`).get();
@@ -118,15 +128,15 @@ export const generateapplepass = onRequest({
         let cardColor = businessCardData.color || "#5134f9";
         if (!cardColor.startsWith('#')) cardColor = `#${cardColor}`;
 
-        // 3. Crear el pase
-        // Importante: Si el signer es PEM y contiene cert + key, se puede pasar igual a ambos campos.
+        // 3. Configuración de certificados
         const certificates = {
             wwdr: wwdr,
             signerCert: signer,
-            signerKey: signer, 
+            signerKey: signer, // Asumimos que el PEM tiene ambos o es un .p12
             signerKeyPassphrase: (password && password !== "." && password !== "") ? password : undefined
         };
 
+        // 4. Instancia del pase
         const pass = new PKPass(certificates, {
             passTypeIdentifier: "pass.com.loyalfly.card",
             teamIdentifier: "8W9R78X846",
@@ -155,18 +165,14 @@ export const generateapplepass = onRequest({
         pass.labelColor = textColor;
         pass.foregroundColor = textColor;
 
-        // 4. Imágenes
-        let imageAdded = false;
+        // 5. Imágenes
         if (businessCardData.logoUrl) {
             const logoBuffer = await fetchImageBuffer(businessCardData.logoUrl);
             if (logoBuffer) {
                 pass.addBuffer("logo.png", logoBuffer);
                 pass.addBuffer("icon.png", logoBuffer);
-                imageAdded = true;
             }
-        }
-
-        if (!imageAdded) {
+        } else {
             const defaultIcon = await fetchImageBuffer("https://res.cloudinary.com/dg4wbuppq/image/upload/v1762622899/ico_loyalfly_xgfdv8.png");
             if (defaultIcon) {
                 pass.addBuffer("icon.png", defaultIcon);
@@ -181,16 +187,13 @@ export const generateapplepass = onRequest({
         res.status(200).send(buffer);
 
     } catch (error) {
-        console.error("ERROR CRÍTICO GENERANDO APPLE PASS:", {
-            message: error.message,
-            stack: error.stack
-        });
-        res.status(500).send(`Error: ${error.message}`);
+        console.error("ERROR CRÍTICO GENERANDO APPLE PASS:", error.message);
+        res.status(500).send(`Error de validación: ${error.message}. Asegúrese de que sus certificados en Secret Manager no tengan espacios extras y sean válidos.`);
     }
 });
 
 /**
- * GOOGLE WALLET Y OTROS
+ * GOOGLE WALLET Y OTROS (Sin cambios necesarios)
  */
 async function getGoogleAuthToken() {
   const sa = loadServiceAccount();
