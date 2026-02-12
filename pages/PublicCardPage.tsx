@@ -8,6 +8,11 @@ import ExclamationCircleIcon from '../components/icons/ExclamationCircleIcon';
 import LanguageSelector from '../components/LanguageSelector';
 import { useTranslation } from 'react-i18next';
 
+// --- CONFIGURACIÓN DE BACKEND (Cloud Functions) ---
+// Actualiza estas URLs cuando despliegues nuevas versiones desde Cloud Shell
+const GOOGLE_WALLET_URL = "https://generatewalletpass-2idcsaj5va-uc.a.run.app";
+const APPLE_WALLET_URL = "https://generateapplepass-2idcsaj5va-uc.a.run.app";
+
 type ViewState = 'lookup' | 'register' | 'display';
 
 interface CardSettings {
@@ -29,17 +34,14 @@ interface SurveySettings {
 }
 
 const validateMexicanPhoneNumber = (phone: string): string => {
-    if (!phone) return ""; // Let basic required check handle empty
+    if (!phone) return ""; 
     let cleaned = phone.trim();
-
     if (cleaned.startsWith('+521')) {
         cleaned = cleaned.substring(4);
     } else if (cleaned.startsWith('+52')) {
         cleaned = cleaned.substring(3);
     }
-
     cleaned = cleaned.replace(/\D/g, '');
-
     return /^\d{10}$/.test(cleaned) ? "" : "Por favor, ingresa un número de teléfono válido de 10 dígitos.";
 };
 
@@ -48,28 +50,21 @@ const PublicCardPage: React.FC = () => {
     const { slug } = useParams<{ slug: string }>();
     const topRef = useRef<HTMLDivElement>(null);
 
-    // Business & UI State
     const [settings, setSettings] = useState<CardSettings | null>(null);
     const [businessId, setBusinessId] = useState<string | null>(null);
-    const [loading, setLoading] = useState(true); // Initial page load
-    const [isSubmitting, setIsSubmitting] = useState(false); // For form submissions
+    const [loading, setLoading] = useState(true); 
+    const [isSubmitting, setIsSubmitting] = useState(false); 
     const [errors, setErrors] = useState<{ phoneLookup?: string, userName?: string, userPhone?: string, userEmail?: string, form?: string }>({});
 
-    // View & Customer State
     const [view, setView] = useState<ViewState>('lookup');
     const [customer, setCustomer] = useState<Customer | null>(null);
     const [surveySettings, setSurveySettings] = useState<SurveySettings | null>(null);
     const [hasVoted, setHasVoted] = useState(true);
     
-    // Form Inputs State
-    const [phoneLookup, setPhoneLookup] = useState(''); // For the lookup form
+    const [phoneLookup, setPhoneLookup] = useState(''); 
     const [userName, setUserName] = useState('');
     const [userPhone, setUserPhone] = useState('');
     const [userEmail, setUserEmail] = useState('');
-
-    // Cloud Function Base URLs
-    const GOOGLE_WALLET_URL = "https://generatewalletpass-2idcsaj5va-uc.a.run.app";
-    const APPLE_WALLET_URL = "https://generateapplepass-2idcsaj5va-uc.a.run.app";
 
     useEffect(() => {
         document.title = 'Loyalfly';
@@ -101,7 +96,6 @@ const PublicCardPage: React.FC = () => {
                 setLoading(false);
             }
         };
-
         fetchSettings();
     }, [slug]);
 
@@ -119,13 +113,11 @@ const PublicCardPage: React.FC = () => {
     const handleLookup = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!businessId || !phoneLookup) return;
-
         const phoneError = validateMexicanPhoneNumber(phoneLookup);
         if (phoneError) {
             setErrors({ phoneLookup: phoneError });
             return;
         }
-
         setIsSubmitting(true);
         setErrors({});
         try {
@@ -155,25 +147,19 @@ const PublicCardPage: React.FC = () => {
     const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!businessId) return;
-
         const newErrors: { userName?: string, userPhone?: string, userEmail?: string } = {};
         if (!userName) newErrors.userName = "Tu nombre es requerido.";
-        
         const phoneError = validateMexicanPhoneNumber(userPhone);
         if (phoneError) newErrors.userPhone = phoneError;
-        
         if (userEmail && !/\S+@\S+\.\S+/.test(userEmail)) {
             newErrors.userEmail = "No es una dirección de email válida.";
         }
-        
         if (Object.keys(newErrors).length > 0) {
             setErrors(newErrors);
             return;
         }
-        
         setIsSubmitting(true);
         setErrors({});
-
         try {
             const existingCustomer = await getCustomerByPhone(businessId, userPhone);
             if (existingCustomer) {
@@ -181,7 +167,6 @@ const PublicCardPage: React.FC = () => {
                 setIsSubmitting(false);
                 return;
             }
-
             const newCustomer = await createNewCustomer(businessId, { name: userName, phone: userPhone, email: userEmail });
             setCustomer(newCustomer);
             const surveyData = await getSurveySettings(businessId);
@@ -210,7 +195,6 @@ const PublicCardPage: React.FC = () => {
 
     const getGoogleWalletBadgeUrl = () => {
         const lang = i18n.language.split('-')[0];
-        // New URLs provided by the user for Google Wallet
         if (lang === 'es') return 'https://res.cloudinary.com/dg4wbuppq/image/upload/v1770771245/esUS_add_to_google_wallet_add-wallet-badge_qmkpl1.svg';
         if (lang === 'pt') return 'https://res.cloudinary.com/dg4wbuppq/image/upload/v1770771211/br_add_to_google_wallet_add-wallet-badge_zpnazi.svg';
         return 'https://res.cloudinary.com/dg4wbuppq/image/upload/v1770771222/enUS_add_to_google_wallet_add-wallet-badge_lfceip.svg';
@@ -218,7 +202,6 @@ const PublicCardPage: React.FC = () => {
 
     const getAppleWalletBadgeUrl = () => {
         const lang = i18n.language.split('-')[0];
-        // URLs oficiales de Apple Wallet desde Cloudinary
         if (lang === 'es') return 'https://res.cloudinary.com/dg4wbuppq/image/upload/v1770770709/ESMX_Add_to_Apple_Wallet_RGB_101821_in2cem.svg';
         if (lang === 'pt') return 'https://res.cloudinary.com/dg4wbuppq/image/upload/v1770770808/PT_Add_to_Apple_Wallet_RGB_102021_m9ggwe.svg';
         return 'https://res.cloudinary.com/dg4wbuppq/image/upload/v1770770828/US-UK_Add_to_Apple_Wallet_RGB_101421_hkprrj.svg';
@@ -233,7 +216,6 @@ const PublicCardPage: React.FC = () => {
                 </div>
             )
         }
-        
         const businessHeader = (
             <div className="text-center mb-6 animate-fade-in-up">
                 {settings?.logoUrl ? (
@@ -257,7 +239,6 @@ const PublicCardPage: React.FC = () => {
                             <div className="bg-white p-6 border border-gray-200 rounded-lg shadow-sm">
                                 <form onSubmit={handleLookup} className="space-y-4">
                                     <div>
-                                        <label htmlFor="phoneLookup" className="sr-only">{t('common.phone')}</label>
                                         <div className="relative">
                                             <input
                                                 id="phoneLookup"
@@ -297,7 +278,6 @@ const PublicCardPage: React.FC = () => {
                         </div>
                     </div>
                 );
-            
             case 'register':
                 return (
                     <div>
@@ -307,7 +287,6 @@ const PublicCardPage: React.FC = () => {
                              <div className="bg-white p-6 border border-gray-200 rounded-lg shadow-sm">
                                 <form onSubmit={handleRegister} className="space-y-4">
                                     <div>
-                                        <label htmlFor="userName" className="block text-base font-medium text-gray-700 sr-only">{t('common.name')}</label>
                                         <div className="relative">
                                             <input
                                                 id="userName"
@@ -328,7 +307,6 @@ const PublicCardPage: React.FC = () => {
                                         <ErrorMessage message={errors.userName} />
                                     </div>
                                     <div>
-                                        <label htmlFor="userPhone" className="block text-base font-medium text-gray-700 sr-only">{t('common.phone')}</label>
                                          <div className="relative">
                                             <input
                                                 id="userPhone"
@@ -350,9 +328,6 @@ const PublicCardPage: React.FC = () => {
                                         <ErrorMessage message={errors.userPhone} />
                                     </div>
                                     <div>
-                                        <label htmlFor="userEmail" className="block text-base font-medium text-gray-700 sr-only">
-                                            {t('common.email')}
-                                        </label>
                                         <div className="relative">
                                             <input
                                                 id="userEmail"
@@ -390,7 +365,6 @@ const PublicCardPage: React.FC = () => {
                         </div>
                     </div>
                 );
-            
             case 'display':
                 return (
                      <div className="animate-fade-in-up">
@@ -412,8 +386,6 @@ const PublicCardPage: React.FC = () => {
                           customerPhone={customer?.phone}
                           customerId={customer?.id}
                         />
-
-                        {/* Wallet Integration Buttons - Always Show Both for maximum compatibility */}
                         <div className="mt-8 flex justify-center">
                             <div className="flex flex-col sm:flex-row items-center gap-4">
                                 <button 
@@ -421,44 +393,25 @@ const PublicCardPage: React.FC = () => {
                                     className="transition-transform hover:scale-105 active:scale-95 focus:outline-none"
                                     aria-label={t('card.addToAppleWallet')}
                                 >
-                                    <img 
-                                        src={getAppleWalletBadgeUrl()} 
-                                        alt={t('card.addToAppleWallet')}
-                                        className="h-[52px] w-auto shadow-sm"
-                                    />
+                                    <img src={getAppleWalletBadgeUrl()} alt={t('card.addToAppleWallet')} className="h-[52px] w-auto shadow-sm" />
                                 </button>
-                                
                                 <button 
                                     onClick={handleAddToGoogleWallet}
                                     className="transition-transform hover:scale-105 active:scale-95 focus:outline-none"
                                     aria-label={t('card.addToGoogleWallet')}
                                 >
-                                    <img 
-                                        src={getGoogleWalletBadgeUrl()} 
-                                        alt={t('card.addToGoogleWallet')}
-                                        className="h-[52px] w-auto shadow-sm"
-                                    />
+                                    <img src={getGoogleWalletBadgeUrl()} alt={t('card.addToGoogleWallet')} className="h-[52px] w-auto shadow-sm" />
                                 </button>
                             </div>
                         </div>
-
                         <button
-                           onClick={() => {
-                               setView('lookup');
-                               setCustomer(null);
-                               setPhoneLookup('');
-                               setErrors({});
-                           }}
+                           onClick={() => { setView('lookup'); setCustomer(null); setPhoneLookup(''); setErrors({}); }}
                            className="mt-10 w-full py-2.5 px-4 text-base font-medium text-gray-700 bg-white border border-gray-200 rounded-md shadow-sm hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400"
                        >
                            {t('publicView.consultOther')}
                        </button>
-
                         {settings?.plan === 'Gratis' && (
-                            <Link
-                                to="/"
-                                className="mt-4 w-full py-3 px-4 flex items-center justify-center gap-3 text-base font-bold text-white bg-[#4D17FF] rounded-md shadow-md hover:bg-[#3a11cc] transition-colors"
-                            >
+                            <Link to="/" className="mt-4 w-full py-3 px-4 flex items-center justify-center gap-3 text-base font-bold text-white bg-[#4D17FF] rounded-md shadow-md hover:bg-[#3a11cc] transition-colors">
                                 <img src="https://res.cloudinary.com/dg4wbuppq/image/upload/v1762622899/ico_loyalfly_xgfdv8.svg" alt="" className="w-6 h-6" />
                                 <span>{t('card.join')} {settings.name}</span>
                             </Link>
@@ -480,17 +433,13 @@ const PublicCardPage: React.FC = () => {
   
     return (
         <div ref={topRef} className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4 font-sans">
-            <div className="w-full max-w-sm mx-auto">
-                {renderContent()}
-            </div>
+            <div className="w-full max-w-sm mx-auto">{renderContent()}</div>
             <div className="text-center text-sm text-gray-500 mt-8 flex flex-col items-center gap-4">
               <div>
                 <p>{t('common.poweredBy')}</p>
                 <Link to="/terminos" className="hover:underline">{t('header.terms')}</Link>
               </div>
-              <div className="my-4">
-                 <LanguageSelector />
-              </div>
+              <div className="my-4"><LanguageSelector /></div>
             </div>
         </div>
       );
