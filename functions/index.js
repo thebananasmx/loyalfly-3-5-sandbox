@@ -41,6 +41,7 @@ exports.generateapplepass = onRequest({
     region: "us-central1",
     memory: "256MiB",
     maxInstances: 10,
+    invoker: "public", // Forzar acceso público
     secrets: [APPLE_PASS_CERT_BASE64, APPLE_PASS_PASSWORD, APPLE_WWDR_CERT_BASE64]
 }, async (req, res) => {
     const { bid, cid } = req.query;
@@ -61,22 +62,19 @@ exports.generateapplepass = onRequest({
         const stamps = customerData.stamps || 0;
         const rewards = Math.floor(stamps / 10);
         
-        // Convertir color hex a RGB para Apple Pass si fuera necesario, 
-        // pero passkit-generator acepta hex strings.
         let cardColor = businessCardData.color || "#5134f9";
         if (!cardColor.startsWith('#')) cardColor = `#${cardColor}`;
 
-        // Crear el Pase
         const pass = new PKPass({}, {
             wwdr: Buffer.from(APPLE_WWDR_CERT_BASE64.value(), "base64"),
             signerCert: Buffer.from(APPLE_PASS_CERT_BASE64.value(), "base64"),
-            signerKey: Buffer.from(APPLE_PASS_CERT_BASE64.value(), "base64"), // Usualmente el .p12 base64 contiene ambos
+            signerKey: Buffer.from(APPLE_PASS_CERT_BASE64.value(), "base64"), 
             signerKeyPassphrase: APPLE_PASS_PASSWORD.value(),
         });
 
         pass.setMetadata({
-            passTypeIdentifier: "pass.com.loyalfly.loyalty", // Debe coincidir con tu certificado
-            teamIdentifier: "YOUR_TEAM_ID", // Reemplazar con tu Team ID de Apple
+            passTypeIdentifier: "pass.com.loyalfly.loyalty", 
+            teamIdentifier: "YOUR_TEAM_ID", 
             organizationName: "Loyalfly",
             serialNumber: cid,
             sharingProhibited: true
@@ -84,20 +82,9 @@ exports.generateapplepass = onRequest({
 
         pass.type = "storeCard";
         pass.headerFields.add({ key: "logoText", label: "", value: bizName });
-        
         pass.primaryFields.add({ key: "customerName", label: "CLIENTE", value: customerData.name || "Invitado" });
-        
-        pass.secondaryFields.add({ 
-            key: "stamps", 
-            label: "SELLOS", 
-            value: `${stamps}` 
-        });
-
-        pass.auxiliaryFields.add({ 
-            key: "rewards", 
-            label: "PREMIOS", 
-            value: `${rewards}` 
-        });
+        pass.secondaryFields.add({ key: "stamps", label: "SELLOS", value: `${stamps}` });
+        pass.auxiliaryFields.add({ key: "rewards", label: "PREMIOS", value: `${rewards}` });
 
         pass.setBarcodes({
             format: "PKBarcodeFormatQR",
@@ -106,16 +93,11 @@ exports.generateapplepass = onRequest({
             altText: customerData.phone || cid.substring(0, 8)
         });
 
-        // Colores y Estilo
         pass.setBackgroundColor(cardColor);
         pass.setLabelColor(businessCardData.textColorScheme === 'light' ? "rgb(255,255,255)" : "rgb(0,0,0)");
         pass.setForegroundColor(businessCardData.textColorScheme === 'light' ? "rgb(255,255,255)" : "rgb(0,0,0)");
 
-        // Logo: Si existe logoUrl, podríamos descargarlo e inyectarlo, 
-        // pero por ahora usamos el logoText de la cabecera.
-
         const buffer = await pass.asBuffer();
-        
         res.setHeader("Content-Type", "application/vnd.apple.pkpass");
         res.setHeader("Content-Disposition", `attachment; filename=loyalfly-${cid}.pkpass`);
         res.status(200).send(buffer);
@@ -132,6 +114,7 @@ exports.generateapplepass = onRequest({
 exports.generatewalletpass = onRequest({ 
     region: "us-central1", 
     memory: "256MiB",
+    invoker: "public", // Forzar acceso público
     maxInstances: 10 
 }, async (req, res) => {
   const { bid, cid } = req.query;
