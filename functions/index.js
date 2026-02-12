@@ -24,8 +24,6 @@ function loadServiceAccount() {
     if (existsSync(saPath)) {
       serviceAccount = JSON.parse(readFileSync(saPath, "utf8"));
       return serviceAccount;
-    } else {
-      console.warn("ADVERTENCIA: service-account-key.json no encontrado en:", saPath);
     }
   } catch (err) {
     console.error("ERROR cargando service-account-key.json:", err.message);
@@ -65,7 +63,6 @@ export const generateapplepass = onRequest({
     region: "us-central1",
     memory: "512MiB",
     maxInstances: 10,
-    // Nota: Si el deploy sigue fallando aquí, asegúrate de que los secretos existan en la consola de Google Cloud.
     secrets: [APPLE_PASS_CERT_BASE64, APPLE_PASS_PASSWORD, APPLE_WWDR_CERT_BASE64]
 }, async (req, res) => {
     const { bid, cid } = req.query;
@@ -89,19 +86,29 @@ export const generateapplepass = onRequest({
         let cardColor = businessCardData.color || "#5134f9";
         if (!cardColor.startsWith('#')) cardColor = `#${cardColor}`;
 
-        // Obtener valores de secretos de forma segura
-        const wwdrRaw = (APPLE_WWDR_CERT_BASE64.value() || "").replace(/\s/g, '');
-        const signerRaw = (APPLE_PASS_CERT_BASE64.value() || "").replace(/\s/g, '');
+        // LIMPIEZA DE SECRETOS: Solo quitamos espacios y saltos de línea comunes
+        // Si el usuario pegó el Base64, esto lo deja limpio.
+        const cleanBase64 = (val) => (val || "").replace(/[\s\n\r\t]/g, '');
+        
+        const wwdrRaw = cleanBase64(APPLE_WWDR_CERT_BASE64.value());
+        const signerRaw = cleanBase64(APPLE_PASS_CERT_BASE64.value());
         const password = APPLE_PASS_PASSWORD.value();
 
-        if (!wwdrRaw || !signerRaw) {
-            throw new Error("Certificados no disponibles. Verifica los secretos en la consola.");
+        // Diagnóstico en Logs (Ayuda a saber si el secreto llegó vacío)
+        console.log(`Diagnóstico Apple Pass: WWDR Len: ${wwdrRaw.length}, Signer Len: ${signerRaw.length}`);
+
+        if (wwdrRaw.length < 10 || signerRaw.length < 10) {
+            throw new Error("Uno de los certificados en Secret Manager parece estar vacío o ser demasiado corto.");
         }
 
+        const wwdrBuffer = Buffer.from(wwdrRaw, "base64");
+        const signerBuffer = Buffer.from(signerRaw, "base64");
+
+        // PKPass Constructor (v3 API)
         const pass = new PKPass({
-            wwdr: Buffer.from(wwdrRaw, "base64"),
-            signerCert: Buffer.from(signerRaw, "base64"),
-            signerKey: Buffer.from(signerRaw, "base64"), 
+            wwdr: wwdrBuffer,
+            signerCert: signerBuffer,
+            signerKey: signerBuffer, 
             signerKeyPassphrase: password,
         }, {
             passTypeIdentifier: "pass.com.loyalfly.loyalty", 
@@ -111,24 +118,27 @@ export const generateapplepass = onRequest({
             sharingProhibited: true
         });
 
+        // Configuración de campos (v3 usa .push en lugar de .add)
         pass.type = "storeCard";
-        pass.headerFields.add({ key: "logoText", value: "Loyalfly" });
-        pass.primaryFields.add({ key: "bizName", label: "NEGOCIO", value: bizName });
-        pass.secondaryFields.add({ key: "customerName", label: "CLIENTE", value: customerData.name || "Invitado" });
-        pass.auxiliaryFields.add({ key: "stamps", label: "SELLOS", value: `${stamps}` });
-        pass.auxiliaryFields.add({ key: "rewards", label: "PREMIOS", value: `${rewards}` });
+        pass.headerFields.push({ key: "logoText", value: "Loyalfly" });
+        pass.primaryFields.push({ key: "bizName", label: "NEGOCIO", value: bizName });
+        pass.secondaryFields.push({ key: "customerName", label: "CLIENTE", value: customerData.name || "Invitado" });
+        pass.auxiliaryFields.push({ key: "stamps", label: "SELLOS", value: `${stamps}` });
+        pass.auxiliaryFields.push({ key: "rewards", label: "PREMIOS", value: `${rewards}` });
 
-        pass.setBarcodes({
+        // Barcodes (v3 API es una propiedad)
+        pass.barcodes = [{
             format: "PKBarcodeFormatQR",
             message: cid,
             messageEncoding: "iso-8859-1",
             altText: customerData.phone || cid.substring(0, 8)
-        });
+        }];
 
-        pass.setBackgroundColor(cardColor);
+        // Estilos
+        pass.backgroundColor = cardColor;
         const colorString = businessCardData.textColorScheme === 'dark' ? "rgb(0,0,0)" : "rgb(255,255,255)";
-        pass.setLabelColor(colorString);
-        pass.setForegroundColor(colorString);
+        pass.labelColor = colorString;
+        pass.foregroundColor = colorString;
 
         const buffer = await pass.asBuffer();
         
@@ -138,7 +148,11 @@ export const generateapplepass = onRequest({
 
     } catch (error) {
         console.error("ERROR GENERATE APPLE PASS:", error);
-        res.status(500).send("Error de servidor: No se pudo generar el pase de Apple.");
+        // Si es un error de validación de la librería, damos más detalle
+        const detail = error.message.includes("ValidationError") ? 
+            "Error de certificados: Asegúrate de que APPLE_WWDR_CERT_BASE64 y APPLE_PASS_CERT_BASE64 sean Base64 válidos de archivos .pem o .p12." : 
+            error.message;
+        res.status(500).send(`Error de servidor: ${detail}`);
     }
 });
 
