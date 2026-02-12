@@ -1,6 +1,6 @@
 {
-  "name": "Loyalfly App - v3.5.0",
-  "description": "Sistema de lealtad digital para negocios.",
+  "name": "Sand box Loyalfly - v3.5.0.19",
+  "description": "A minimalist, fast, and modern Single Page Application for Loyalfly, a customer loyalty service. Built with React, Vite, and Tailwind CSS, and designed for seamless deployment on Vercel.",
   "requestFramePermissions": [
     "camera"
   ]
