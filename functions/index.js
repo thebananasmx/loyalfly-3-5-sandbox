@@ -11,7 +11,7 @@ const serviceAccount = require("./service-account-key.json");
 admin.initializeApp();
 const db = admin.firestore();
 
-// Secretos de Apple
+// Definición de Secretos
 const APPLE_PASS_CERT_BASE64 = defineSecret("APPLE_PASS_CERT_BASE64");
 const APPLE_PASS_PASSWORD = defineSecret("APPLE_PASS_PASSWORD");
 const APPLE_WWDR_CERT_BASE64 = defineSecret("APPLE_WWDR_CERT_BASE64");
@@ -65,25 +65,56 @@ exports.generateapplepass = onRequest({
         let cardColor = businessCardData.color || "#5134f9";
         if (!cardColor.startsWith('#')) cardColor = `#${cardColor}`;
 
-        // PKPass v3: La metadata se pasa en el primer objeto del constructor
+        // Limpiar y cargar certificados
+        const wwdrRaw = APPLE_WWDR_CERT_BASE64.value().replace(/\s/g, '');
+        const signerRaw = APPLE_PASS_CERT_BASE64.value().replace(/\s/g, '');
+        const password = APPLE_PASS_PASSWORD.value();
+
+        if (!wwdrRaw || wwdrRaw.length < 10) {
+            throw new Error("El secreto APPLE_WWDR_CERT_BASE64 parece estar vacío o mal configurado.");
+        }
+
+        // PKPass v3 Constructor
         const pass = new PKPass({
+            wwdr: Buffer.from(wwdrRaw, "base64"),
+            signerCert: Buffer.from(signerRaw, "base64"),
+            signerKey: Buffer.from(signerRaw, "base64"), 
+            signerKeyPassphrase: password,
+        }, {
             passTypeIdentifier: "pass.com.loyalfly.loyalty", 
-            teamIdentifier: "YOUR_TEAM_ID", // Cambiar por tu ID real de Apple Developer
-            organizationName: "Loyalfly",
+            teamIdentifier: "8W9R78X846", // DEBES ASEGURARTE QUE ESTE SEA TU TEAM ID REAL
+            organizationName: bizName,
             serialNumber: cid,
             sharingProhibited: true
-        }, {
-            wwdr: Buffer.from(APPLE_WWDR_CERT_BASE64.value(), "base64"),
-            signerCert: Buffer.from(APPLE_PASS_CERT_BASE64.value(), "base64"),
-            signerKey: Buffer.from(APPLE_PASS_CERT_BASE64.value(), "base64"), 
-            signerKeyPassphrase: APPLE_PASS_PASSWORD.value(),
         });
 
         pass.type = "storeCard";
-        pass.headerFields.add({ key: "logoText", label: "", value: bizName });
-        pass.primaryFields.add({ key: "customerName", label: "CLIENTE", value: customerData.name || "Invitado" });
-        pass.secondaryFields.add({ key: "stamps", label: "SELLOS", value: `${stamps}` });
-        pass.auxiliaryFields.add({ key: "rewards", label: "PREMIOS", value: `${rewards}` });
+        
+        pass.headerFields.add({ key: "logoText", value: "Loyalfly" });
+        
+        pass.primaryFields.add({ 
+            key: "bizName", 
+            label: "NEGOCIO", 
+            value: bizName 
+        });
+        
+        pass.secondaryFields.add({ 
+            key: "customerName", 
+            label: "CLIENTE", 
+            value: customerData.name || "Invitado" 
+        });
+        
+        pass.auxiliaryFields.add({ 
+            key: "stamps", 
+            label: "SELLOS", 
+            value: `${stamps}` 
+        });
+        
+        pass.auxiliaryFields.add({ 
+            key: "rewards", 
+            label: "PREMIOS", 
+            value: `${rewards}` 
+        });
 
         pass.setBarcodes({
             format: "PKBarcodeFormatQR",
@@ -93,16 +124,15 @@ exports.generateapplepass = onRequest({
         });
 
         pass.setBackgroundColor(cardColor);
-        
-        // Colores de texto automáticos
-        const isDark = businessCardData.textColorScheme === 'light';
-        const colorString = isDark ? "rgb(255,255,255)" : "rgb(0,0,0)";
+        const isDarkText = businessCardData.textColorScheme === 'dark';
+        const colorString = isDarkText ? "rgb(0,0,0)" : "rgb(255,255,255)";
         pass.setLabelColor(colorString);
         pass.setForegroundColor(colorString);
 
         const buffer = await pass.asBuffer();
+        
         res.setHeader("Content-Type", "application/vnd.apple.pkpass");
-        res.setHeader("Content-Disposition", `attachment; filename=loyalfly-${cid}.pkpass`);
+        res.setHeader("Content-Disposition", `attachment; filename=pass.pkpass`);
         res.status(200).send(buffer);
 
     } catch (error) {
