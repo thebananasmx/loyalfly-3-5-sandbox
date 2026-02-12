@@ -9,7 +9,7 @@ import LanguageSelector from '../components/LanguageSelector';
 import { useTranslation } from 'react-i18next';
 
 // --- CONFIGURACIÓN DE BACKEND (Cloud Functions) ---
-// Actualiza estas URLs cuando despliegues nuevas versiones desde Cloud Shell
+// Estas URLs se generan tras correr 'npm run deploy:backend' en Cloud Shell
 const GOOGLE_WALLET_URL = "https://generatewalletpass-2idcsaj5va-uc.a.run.app";
 const APPLE_WALLET_URL = "https://generateapplepass-2idcsaj5va-uc.a.run.app";
 

@@ -11,22 +11,6 @@ declare global {
   }
 }
 
-// FIX: Added module declaration for 'react-router-dom' to resolve widespread "Module has no exported member" errors.
-// This ensures that the compiler can resolve standard React Router v6 components and hooks used throughout the application.
-declare module 'react-router-dom' {
-  export const BrowserRouter: any;
-  export const HashRouter: any;
-  export const Routes: any;
-  export const Route: any;
-  export const Navigate: any;
-  export const Outlet: any;
-  export const Link: any;
-  export const NavLink: any;
-  export const useLocation: any;
-  export const useParams: any;
-  export const useNavigate: any;
-}
-
 export interface Customer {
   id: string;
   name: string;
