@@ -1,47 +1,141 @@
+
 const { onRequest } = require("firebase-functions/v2/https");
 const { onDocumentUpdated } = require("firebase-functions/v2/firestore");
-const { defineSecret } = require('firebase-functions/params');
+const { defineSecret } = require("firebase-functions/params");
 const admin = require("firebase-admin");
+const jwt = require("jsonwebtoken");
+const { GoogleAuth } = require("google-auth-library");
+const { PKPass } = require("passkit-generator");
 const serviceAccount = require("./service-account-key.json");
 
-// Logs de inicio para diagnóstico
-console.log("Iniciando contenedor de funciones...");
-
-// Definición de secretos (Deben existir en Secret Manager)
-const APPLE_PASS_CERT = defineSecret('APPLE_PASS_CERT_BASE64');
-const APPLE_PASS_PASSWORD = defineSecret('APPLE_PASS_PASSWORD');
-const APPLE_WWDR_CERT = defineSecret('APPLE_WWDR_CERT_BASE64');
-
-// Inicialización limpia
-try {
-    admin.initializeApp();
-    console.log("Firebase Admin inicializado correctamente.");
-} catch (e) {
-    console.error("Error inicializando Firebase Admin:", e);
-}
-
+admin.initializeApp();
 const db = admin.firestore();
+
+// Secretos de Apple
+const APPLE_PASS_CERT_BASE64 = defineSecret("APPLE_PASS_CERT_BASE64");
+const APPLE_PASS_PASSWORD = defineSecret("APPLE_PASS_PASSWORD");
+const APPLE_WWDR_CERT_BASE64 = defineSecret("APPLE_WWDR_CERT_BASE64");
+
 const ISSUER_ID = "3388000000023072020";
 
-// Carga diferida de librerías pesadas para evitar timeout en el arranque
-let GoogleAuth;
-let PKPass;
+/**
+ * Obtiene un token de acceso OAuth2 para la API de Google Wallet
+ */
+async function getGoogleAuthToken() {
+  const auth = new GoogleAuth({
+    credentials: {
+      client_email: serviceAccount.client_email,
+      private_key: serviceAccount.private_key.replace(/\\n/g, '\n'),
+    },
+    scopes: ["https://www.googleapis.com/auth/wallet_object.issuer"],
+  });
+  const client = await auth.getClient();
+  const token = await client.getAccessToken();
+  return token.token;
+}
 
 /**
- * FUNCIÓN 1: Generación de Pase Google Wallet (JWT)
+ * FUNCIÓN: Generación de Pase para Apple Wallet (.pkpass)
+ */
+exports.generateapplepass = onRequest({
+    region: "us-central1",
+    memory: "256MiB",
+    maxInstances: 10,
+    secrets: [APPLE_PASS_CERT_BASE64, APPLE_PASS_PASSWORD, APPLE_WWDR_CERT_BASE64]
+}, async (req, res) => {
+    const { bid, cid } = req.query;
+    if (!bid || !cid) return res.status(400).send("Faltan parámetros bid o cid.");
+
+    try {
+        const businessCardSnap = await db.doc(`businesses/${bid}/config/card`).get();
+        const businessMainSnap = await db.doc(`businesses/${bid}`).get();
+        const customerSnap = await db.doc(`businesses/${bid}/customers/${cid}`).get();
+
+        if (!customerSnap.exists) return res.status(404).send("Cliente no encontrado.");
+
+        const businessCardData = businessCardSnap.exists ? businessCardSnap.data() : {};
+        const businessMainData = businessMainSnap.exists ? businessMainSnap.data() : {};
+        const customerData = customerSnap.data();
+
+        const bizName = businessCardData.name || businessMainData.name || "Loyalfly";
+        const stamps = customerData.stamps || 0;
+        const rewards = Math.floor(stamps / 10);
+        
+        // Convertir color hex a RGB para Apple Pass si fuera necesario, 
+        // pero passkit-generator acepta hex strings.
+        let cardColor = businessCardData.color || "#5134f9";
+        if (!cardColor.startsWith('#')) cardColor = `#${cardColor}`;
+
+        // Crear el Pase
+        const pass = new PKPass({}, {
+            wwdr: Buffer.from(APPLE_WWDR_CERT_BASE64.value(), "base64"),
+            signerCert: Buffer.from(APPLE_PASS_CERT_BASE64.value(), "base64"),
+            signerKey: Buffer.from(APPLE_PASS_CERT_BASE64.value(), "base64"), // Usualmente el .p12 base64 contiene ambos
+            signerKeyPassphrase: APPLE_PASS_PASSWORD.value(),
+        });
+
+        pass.setMetadata({
+            passTypeIdentifier: "pass.com.loyalfly.loyalty", // Debe coincidir con tu certificado
+            teamIdentifier: "YOUR_TEAM_ID", // Reemplazar con tu Team ID de Apple
+            organizationName: "Loyalfly",
+            serialNumber: cid,
+            sharingProhibited: true
+        });
+
+        pass.type = "storeCard";
+        pass.headerFields.add({ key: "logoText", label: "", value: bizName });
+        
+        pass.primaryFields.add({ key: "customerName", label: "CLIENTE", value: customerData.name || "Invitado" });
+        
+        pass.secondaryFields.add({ 
+            key: "stamps", 
+            label: "SELLOS", 
+            value: `${stamps}` 
+        });
+
+        pass.auxiliaryFields.add({ 
+            key: "rewards", 
+            label: "PREMIOS", 
+            value: `${rewards}` 
+        });
+
+        pass.setBarcodes({
+            format: "PKBarcodeFormatQR",
+            message: cid,
+            messageEncoding: "iso-8859-1",
+            altText: customerData.phone || cid.substring(0, 8)
+        });
+
+        // Colores y Estilo
+        pass.setBackgroundColor(cardColor);
+        pass.setLabelColor(businessCardData.textColorScheme === 'light' ? "rgb(255,255,255)" : "rgb(0,0,0)");
+        pass.setForegroundColor(businessCardData.textColorScheme === 'light' ? "rgb(255,255,255)" : "rgb(0,0,0)");
+
+        // Logo: Si existe logoUrl, podríamos descargarlo e inyectarlo, 
+        // pero por ahora usamos el logoText de la cabecera.
+
+        const buffer = await pass.asBuffer();
+        
+        res.setHeader("Content-Type", "application/vnd.apple.pkpass");
+        res.setHeader("Content-Disposition", `attachment; filename=loyalfly-${cid}.pkpass`);
+        res.status(200).send(buffer);
+
+    } catch (error) {
+        console.error("ERROR GENERATE APPLE PASS:", error);
+        res.status(500).send("Error de generación Apple Pass: " + error.message);
+    }
+});
+
+/**
+ * FUNCIÓN: Generación del Pase Google Wallet (JWT)
  */
 exports.generatewalletpass = onRequest({ 
     region: "us-central1", 
-    memory: "512MiB",
+    memory: "256MiB",
     maxInstances: 10 
 }, async (req, res) => {
-  if (!GoogleAuth) {
-    const authLib = require("google-auth-library");
-    GoogleAuth = authLib.GoogleAuth;
-  }
-  
   const { bid, cid } = req.query;
-  if (!bid || !cid) return res.status(400).send("Faltan parámetros.");
+  if (!bid || !cid) return res.status(400).send("Faltan parámetros bid o cid.");
 
   try {
     const businessCardSnap = await db.doc(`businesses/${bid}/config/card`).get();
@@ -62,7 +156,7 @@ exports.generatewalletpass = onRequest({
     const safeBid = bid.replace(/[^a-zA-Z0-9]/g, '');
     const safeCid = cid.replace(/[^a-zA-Z0-9]/g, '');
     
-    const classId = `${ISSUER_ID}.V24_${safeBid}`; 
+    const classId = `${ISSUER_ID}.V26_${safeBid}`; 
     const objectId = `${ISSUER_ID}.OBJ_${safeBid}_${safeCid}`;
 
     let cardColor = businessCardData.color || "#5134f9";
@@ -88,12 +182,20 @@ exports.generatewalletpass = onRequest({
               twoItems: {
                 startItem: {
                   firstValue: {
-                    fields: [{ fieldPath: "object.textModulesData['sellos']" }]
+                    fields: [
+                      {
+                        fieldPath: "object.textModulesData['sellos']"
+                      }
+                    ]
                   }
                 },
                 endItem: {
                   firstValue: {
-                    fields: [{ fieldPath: "object.textModulesData['recompensas']" }]
+                    fields: [
+                      {
+                        fieldPath: "object.textModulesData['recompensas']"
+                      }
+                    ]
                   }
                 }
               }
@@ -112,8 +214,16 @@ exports.generatewalletpass = onRequest({
       header: { defaultValue: { language: "es-419", value: `${custName}` } },
       subheader: { defaultValue: { language: "es-419", value: `Nombre` } },
       textModulesData: [
-        { id: "sellos", header: "Sellos acumulados", body: `${stamps}` },
-        { id: "recompensas", header: "Recompensas", body: `${rewardsAvailable}` }
+        { 
+          id: "sellos", 
+          header: "Sellos acumulados", 
+          body: `${stamps}` 
+        },
+        { 
+          id: "recompensas", 
+          header: "Recompensas", 
+          body: `${rewardsAvailable}` 
+        }
       ],
       barcode: {
         type: "QR_CODE",
@@ -122,130 +232,87 @@ exports.generatewalletpass = onRequest({
       }
     };
 
-    res.status(500).send("La firma del JWT de Google Wallet requiere configuración de llave privada en Secret Manager.");
+    const claims = {
+      iss: serviceAccount.client_email,
+      aud: "google",
+      typ: "savetowallet",
+      payload: {
+        genericClasses: [genericClass],
+        genericObjects: [genericObject],
+      },
+    };
+
+    const token = jwt.sign(claims, serviceAccount.private_key.replace(/\\n/g, '\n'), { algorithm: "RS256" });
+    res.redirect(`https://pay.google.com/gp/v/save/${token}`);
 
   } catch (error) {
-    res.status(500).send("Error: " + error.message);
+    console.error("ERROR GENERATE WALLET:", error);
+    res.status(500).send("Error de generación Google Wallet: " + error.message);
   }
 });
 
 /**
- * FUNCIÓN 2: Generación de Pase Apple Wallet (.pkpass)
- */
-exports.generateapplepass = onRequest({
-    region: "us-central1",
-    memory: "1GiB", 
-    secrets: [APPLE_PASS_CERT, APPLE_PASS_PASSWORD, APPLE_WWDR_CERT]
-}, async (req, res) => {
-    if (!PKPass) {
-        const passLib = require("passkit-generator");
-        PKPass = passLib.PKPass;
-    }
-
-    const { bid, cid } = req.query;
-    if (!bid || !cid) return res.status(400).send("Faltan parámetros.");
-
-    try {
-        const customerSnap = await db.doc(`businesses/${bid}/customers/${cid}`).get();
-        if (!customerSnap.exists) return res.status(404).send("Cliente no encontrado.");
-
-        const businessCardSnap = await db.doc(`businesses/${bid}/config/card`).get();
-        const businessMainSnap = await db.doc(`businesses/${bid}`).get();
-
-        const cardData = businessCardSnap.data() || {};
-        const mainData = businessMainSnap.data() || {};
-        const custData = customerSnap.data();
-
-        const bizName = (cardData.name || mainData.name || "Loyalfly").substring(0, 20);
-        const stamps = custData.stamps || 0;
-        const rewards = Math.floor(stamps / 10);
-
-        const pass = new PKPass({
-            model: null,
-            certificates: {
-                wwdr: Buffer.from(APPLE_WWDR_CERT.value(), 'base64'),
-                signerCert: Buffer.from(APPLE_PASS_CERT.value(), 'base64'),
-                signerKeyPassphrase: APPLE_PASS_PASSWORD.value(),
-            }
-        });
-
-        pass.setPackDetails({
-            formatVersion: 1,
-            passTypeIdentifier: "pass.com.loyalfly.card",
-            serialNumber: cid,
-            teamIdentifier: "KWQ7439H65",
-            organizationName: bizName,
-            description: `Lealtad ${bizName}`,
-            backgroundColor: cardData.color || "rgb(81, 52, 249)",
-            foregroundColor: cardData.textColorScheme === 'light' ? "rgb(255,255,255)" : "rgb(0,0,0)",
-            labelColor: cardData.textColorScheme === 'light' ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.5)",
-        });
-
-        pass.primaryFields.add({ key: "name", label: "CLIENTE", value: custData.name });
-        pass.secondaryFields.add({ key: "stamps", label: "SELLOS", value: stamps });
-        pass.secondaryFields.add({ key: "rewards", label: "PREMIOS", value: rewards });
-        
-        pass.setBarcodes({
-            message: cid,
-            format: "PKBarcodeFormatQR",
-            messageEncoding: "iso-8859-1"
-        });
-
-        const buffer = await pass.export().then(p => p.asBuffer());
-
-        res.setHeader("Content-Type", "application/vnd.apple.pkpass");
-        res.setHeader("Content-Disposition", `attachment; filename="pass.pkpass"`);
-        res.status(200).send(buffer);
-
-    } catch (error) {
-        console.error("APPLE PASS GENERATION ERROR:", error);
-        res.status(500).send("Error generando pase: " + error.message);
-    }
-});
-
-/**
- * FUNCIÓN 3: TRIGGER DINÁMICO
+ * TRIGGER: Actualización en tiempo real para Google Wallet
  */
 exports.updatewalletonstampchange = onDocumentUpdated({
     document: "businesses/{bid}/customers/{cid}",
     retry: true,
-    memory: "512MiB"
+    memory: "256MiB",
+    maxInstances: 5
 }, async (event) => {
     const newData = event.data.after.data();
     const oldData = event.data.before.data();
+
     if (newData.stamps === oldData.stamps && newData.name === oldData.name) return null;
 
     const { bid, cid } = event.params;
     const safeBid = bid.replace(/[^a-zA-Z0-9]/g, '');
-    const objectId = `${ISSUER_ID}.OBJ_${safeBid}_${cid.replace(/[^a-zA-Z0-9]/g, '')}`;
+    const safeCid = cid.replace(/[^a-zA-Z0-9]/g, '');
+    const objectId = `${ISSUER_ID}.OBJ_${safeBid}_${safeCid}`;
 
     try {
-      const authLib = require("google-auth-library");
-      const auth = new authLib.GoogleAuth({
-        scopes: ["https://www.googleapis.com/auth/wallet_object.issuer"],
-      });
-      const client = await auth.getClient();
-      const token = (await client.getAccessToken()).token;
-
+      const token = await getGoogleAuthToken();
       const stamps = newData.stamps || 0;
       const rewards = Math.floor(stamps / 10);
       const custName = (newData.name || "Cliente").substring(0, 25);
 
       const patchData = {
         header: { defaultValue: { language: "es-419", value: `${custName}` } },
+        subheader: { defaultValue: { language: "es-419", value: `Nombre` } },
         textModulesData: [
-          { id: "sellos", header: "Sellos acumulados", body: `${stamps}` },
-          { id: "recompensas", header: "Recompensas", body: `${rewards}` }
+          { 
+            id: "sellos", 
+            header: "Sellos acumulados", 
+            body: `${stamps}` 
+          },
+          { 
+            id: "recompensas", 
+            header: "Recompensas", 
+            body: `${rewards}` 
+          }
         ]
       };
 
-      await fetch(`https://walletobjects.googleapis.com/walletobjects/v1/genericObject/${objectId}`, {
+      const response = await fetch(
+        `https://walletobjects.googleapis.com/walletobjects/v1/genericObject/${objectId}`,
+        {
           method: 'PATCH',
-          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json"
+          },
           body: JSON.stringify(patchData)
-      });
+        }
+      );
+
+      if (!response.ok) {
+        if (response.status === 404) return null;
+        const errorData = await response.json();
+        throw new Error(JSON.stringify(errorData));
+      }
+      console.log(`Pase Google ${objectId} actualizado con éxito.`);
     } catch (error) {
-      console.error("Error actualizando pase:", error.message);
+      console.error("Error actualizando pase Google:", error.message);
     }
     return null;
 });

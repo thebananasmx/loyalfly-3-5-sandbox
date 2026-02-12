@@ -8,105 +8,35 @@
     <meta name="theme-color" content="#5134F9" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Loyalfly | Programa de Lealtad Digital para Negocios</title>
-    <meta name="description" content="Crea tu tarjeta de lealtad digital en minutos con Loyalfly. Fideliza a tus clientes, aumenta tus ventas y olvídate de las tarjetas de cartón. ¡Simple y efectivo!" />
-    <meta name="keywords" content="programa de lealtad, tarjeta de lealtad digital, fidelización de clientes, sistema de sellos, recompensas para clientes" />
-    <meta name="google-site-verification" content="nWqlQyMSz3U-jsNIUha-RoGzEcsag7gjJdejpwqVUXw" />
-    
-    <!-- Open Graph / Facebook -->
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://loyalfly.com.mx/" />
-    <meta property="og:title" content="Loyalfly | Programa de Lealtad Digital para Negocios" />
-    <meta property="og:description" content="Crea tu tarjeta de lealtad digital en minutos. Fideliza a tus clientes y aumenta tus ventas." />
-    <meta property="og:image" content="https://res.cloudinary.com/dg4wbuppq/image/upload/v1762014799/loyalfly_hero_p4fkee.png" />
-
-    <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image" />
-    <meta property="twitter:url" content="https://loyalfly.com.mx/" />
-    <meta property="twitter:title" content="Loyalfly | Programa de Lealtad Digital para Negocios" />
-    <meta property="twitter:description" content="Crea tu tarjeta de lealtad digital en minutos. Fideliza a tus clientes y aumenta tus ventas." />
-    <meta property="twitter:image" content="https://res.cloudinary.com/dg4wbuppq/image/upload/v1762014799/loyalfly_hero_p4fkee.png" />
-
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-Z4DE1F8NTK"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-
-      gtag('config', 'G-Z4DE1F8NTK');
-      gtag('config', 'AW-11539287487');
-    </script>
-    
     <script src="https://cdn.tailwindcss.com"></script>
-  <script type="importmap">
+    <script type="importmap">
 {
   "imports": {
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "qrcode": "https://esm.sh/qrcode@1.5.3",
-    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.3",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react": "https://esm.sh/react@19.0.0",
+    "react-dom": "https://esm.sh/react-dom@19.0.0",
+    "react-router-dom": "https://esm.sh/react-router-dom@7.0.0",
     "firebase/app": "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js",
     "firebase/auth": "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js",
     "firebase/firestore": "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js",
-    "firebase/": "https://aistudiocdn.com/firebase@^12.3.0/",
-    "html5-qrcode": "https://aistudiocdn.com/html5-qrcode@^2.3.8",
-    "react-dom": "https://aistudiocdn.com/react-dom@^19.2.0",
+    "qrcode": "https://esm.sh/qrcode@1.5.3",
+    "html5-qrcode": "https://esm.sh/html5-qrcode@2.3.8",
     "i18next": "https://esm.sh/i18next@23.10.0",
-    "react-i18next": "https://esm.sh/react-i18next@14.0.5?external=react,react-dom,i18next",
-    "i18next-browser-languagedetector": "https://esm.sh/i18next-browser-languagedetector@7.2.0?external=i18next",
-    "@firebase/app": "https://esm.sh/@firebase/app@^0.14.7",
-    "@firebase/auth": "https://esm.sh/@firebase/auth@^1.12.0",
-    "@firebase/firestore": "https://esm.sh/@firebase/firestore@^4.10.0",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "react-i18next": "https://esm.sh/react-i18next@14.0.5",
+    "i18next-browser-languagedetector": "https://esm.sh/i18next-browser-languagedetector@7.2.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.4",
     "vite": "https://esm.sh/vite@^7.3.1",
+    "@firebase/app": "https://esm.sh/@firebase/app@^0.14.8",
+    "@firebase/auth": "https://esm.sh/@firebase/auth@^1.12.0",
+    "@firebase/firestore": "https://esm.sh/@firebase/firestore@^4.11.0",
     "@firebase/storage": "https://esm.sh/@firebase/storage@^0.14.0"
   }
 }
 </script>
-<style>
-@keyframes fade-in-up {
-  0% {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-.animate-fade-in-up {
-  animation: fade-in-up 0.3s ease-out forwards;
-}
-@keyframes fade-in-down {
-  0% {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-.animate-fade-in-down {
-  animation: fade-in-down 0.3s ease-out forwards;
-}
-@keyframes fade-in {
-  0% {
-    opacity: 0;
-  }
-  100% {
-    opacity: 1;
-  }
-}
-.animate-fade-in {
-  animation: fade-in 0.5s ease-out forwards;
-}
-</style>
-</head>
+  </head>
   <body class="bg-white">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
-    <script src="//code.tidio.co/rpqafs5qkydcidncpoy8nvezzbtpgtpn.js" async></script>
   </body>
 </html>
