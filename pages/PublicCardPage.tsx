@@ -8,10 +8,9 @@ import ExclamationCircleIcon from '../components/icons/ExclamationCircleIcon';
 import LanguageSelector from '../components/LanguageSelector';
 import { useTranslation } from 'react-i18next';
 
-// --- CONFIGURACIÓN DE BACKEND (Cloud Functions) ---
-// Estas URLs se generan tras correr 'npm run deploy:backend' en Cloud Shell
+// --- CONFIGURACIÓN DE BACKEND (Cloud Functions 2nd Gen) ---
 const GOOGLE_WALLET_URL = "https://generatewalletpass-2idcsaj5va-uc.a.run.app";
-const APPLE_WALLET_URL = "https://us-central1-loyalflyapp-3-5-sandbox.cloudfunctions.net/generateapplepass";
+const APPLE_WALLET_URL = "https://generateapplepass-2idcsaj5va-uc.a.run.app";
 
 type ViewState = 'lookup' | 'register' | 'display';
 

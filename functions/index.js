@@ -41,7 +41,7 @@ exports.generateapplepass = onRequest({
     region: "us-central1",
     memory: "256MiB",
     maxInstances: 10,
-    invoker: "public", // Forzar acceso público
+    invoker: "public",
     secrets: [APPLE_PASS_CERT_BASE64, APPLE_PASS_PASSWORD, APPLE_WWDR_CERT_BASE64]
 }, async (req, res) => {
     const { bid, cid } = req.query;
@@ -65,19 +65,18 @@ exports.generateapplepass = onRequest({
         let cardColor = businessCardData.color || "#5134f9";
         if (!cardColor.startsWith('#')) cardColor = `#${cardColor}`;
 
-        const pass = new PKPass({}, {
+        // PKPass v3: La metadata se pasa en el primer objeto del constructor
+        const pass = new PKPass({
+            passTypeIdentifier: "pass.com.loyalfly.loyalty", 
+            teamIdentifier: "YOUR_TEAM_ID", // Cambiar por tu ID real de Apple Developer
+            organizationName: "Loyalfly",
+            serialNumber: cid,
+            sharingProhibited: true
+        }, {
             wwdr: Buffer.from(APPLE_WWDR_CERT_BASE64.value(), "base64"),
             signerCert: Buffer.from(APPLE_PASS_CERT_BASE64.value(), "base64"),
             signerKey: Buffer.from(APPLE_PASS_CERT_BASE64.value(), "base64"), 
             signerKeyPassphrase: APPLE_PASS_PASSWORD.value(),
-        });
-
-        pass.setMetadata({
-            passTypeIdentifier: "pass.com.loyalfly.loyalty", 
-            teamIdentifier: "YOUR_TEAM_ID", 
-            organizationName: "Loyalfly",
-            serialNumber: cid,
-            sharingProhibited: true
         });
 
         pass.type = "storeCard";
@@ -94,8 +93,12 @@ exports.generateapplepass = onRequest({
         });
 
         pass.setBackgroundColor(cardColor);
-        pass.setLabelColor(businessCardData.textColorScheme === 'light' ? "rgb(255,255,255)" : "rgb(0,0,0)");
-        pass.setForegroundColor(businessCardData.textColorScheme === 'light' ? "rgb(255,255,255)" : "rgb(0,0,0)");
+        
+        // Colores de texto automáticos
+        const isDark = businessCardData.textColorScheme === 'light';
+        const colorString = isDark ? "rgb(255,255,255)" : "rgb(0,0,0)";
+        pass.setLabelColor(colorString);
+        pass.setForegroundColor(colorString);
 
         const buffer = await pass.asBuffer();
         res.setHeader("Content-Type", "application/vnd.apple.pkpass");
@@ -114,7 +117,7 @@ exports.generateapplepass = onRequest({
 exports.generatewalletpass = onRequest({ 
     region: "us-central1", 
     memory: "256MiB",
-    invoker: "public", // Forzar acceso público
+    invoker: "public",
     maxInstances: 10 
 }, async (req, res) => {
   const { bid, cid } = req.query;
