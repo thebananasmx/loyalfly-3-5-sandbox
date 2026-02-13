@@ -4,33 +4,14 @@ import { defineSecret } from "firebase-functions/params";
 import admin from "firebase-admin";
 import jwt from "jsonwebtoken";
 import { GoogleAuth } from "google-auth-library";
-import * as PassKitLib from "passkit-generator"; // Importación total para mayor compatibilidad
+import { PKPass } from "passkit-generator"; // Importación estándar v3
 import { readFileSync, existsSync } from "fs";
 import { fileURLToPath } from "url";
 import path from "path";
 import fetch from "node-fetch";
 
-// Manejo de interoperabilidad ESM: extraemos la clase PKPass de forma segura
-const PKPass = PassKitLib.PKPass || (PassKitLib.default && PassKitLib.default.PKPass) || PassKitLib.default;
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-let serviceAccount = null;
-const saPath = path.join(__dirname, "service-account-key.json");
-
-function loadServiceAccount() {
-  if (serviceAccount) return serviceAccount;
-  try {
-    if (existsSync(saPath)) {
-      serviceAccount = JSON.parse(readFileSync(saPath, "utf8"));
-      return serviceAccount;
-    }
-  } catch (err) {
-    console.error("ERROR cargando service-account-key.json:", err.message);
-  }
-  return null;
-}
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -44,13 +25,14 @@ const ISSUER_ID = "3388000000023072020";
 function processCertificate(raw, name) {
     if (!raw) throw new Error(`El secreto ${name} está vacío.`);
     const str = raw.toString().trim();
-    if (str.includes("-----BEGIN")) return Buffer.from(str, "utf-8");
-    const cleaned = str.replace(/^['"]|['"]$/g, '').replace(/\s/g, '');
-    try {
-        return Buffer.from(cleaned, "base64");
-    } catch (e) {
-        throw new Error(`Error decodificando Base64 en ${name}: ${e.message}`);
+    let buffer;
+    if (str.includes("-----BEGIN")) {
+        buffer = Buffer.from(str, "utf-8");
+    } else {
+        const cleaned = str.replace(/^['"]|['"]$/g, '').replace(/\s/g, '');
+        buffer = Buffer.from(cleaned, "base64");
     }
+    return buffer;
 }
 
 async function fetchImageBuffer(url) {
@@ -65,6 +47,7 @@ async function fetchImageBuffer(url) {
     }
 }
 
+/** APPLE PASS **/
 export const generateapplepass = onRequest({
     region: "us-central1",
     memory: "512MiB",
@@ -75,13 +58,11 @@ export const generateapplepass = onRequest({
     if (!bid || !cid) return res.status(400).send("Faltan parámetros.");
 
     try {
-        // 1. Preparar Certificados
         const wwdr = processCertificate(APPLE_WWDR_CERT_BASE64.value(), "WWDR");
         const signer = processCertificate(APPLE_PASS_CERT_BASE64.value(), "SIGNER");
         const rawPass = APPLE_PASS_PASSWORD.value()?.toString() || "";
         const password = rawPass.trim().replace(/^['"]|['"]$/g, '');
 
-        // 2. Obtener Datos
         const [businessCardSnap, businessMainSnap, customerSnap] = await Promise.all([
             db.doc(`businesses/${bid}/config/card`).get(),
             db.doc(`businesses/${bid}`).get(),
@@ -98,7 +79,6 @@ export const generateapplepass = onRequest({
         const isLight = businessCardData.textColorScheme === 'light';
         const txtColor = isLight ? "rgb(255,255,255)" : "rgb(0,0,0)";
 
-        // 3. Definir pass.json (Estructura pura)
         const passJson = {
             formatVersion: 1,
             passTypeIdentifier: "pass.com.loyalfly.card",
@@ -109,7 +89,7 @@ export const generateapplepass = onRequest({
             backgroundColor: businessCardData.color || "#5134f9",
             foregroundColor: txtColor,
             labelColor: txtColor,
-            logoText: "Loyalfly",
+            logoText: bizName,
             sharingProhibited: true,
             storeCard: {
                 primaryFields: [{ key: "bizName", label: "NEGOCIO", value: bizName }],
@@ -125,48 +105,59 @@ export const generateapplepass = onRequest({
             }]
         };
 
-        // 4. Crear el Modelo en memoria con imágenes
         const logoUrl = businessCardData.logoUrl || "https://res.cloudinary.com/dg4wbuppq/image/upload/v1762622899/ico_loyalfly_xgfdv8.png";
         const logoBuffer = await fetchImageBuffer(logoUrl);
+        const fallbackIcon = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64");
+        const finalIcon = logoBuffer || fallbackIcon;
 
-        const modelFiles = {
-            "pass.json": Buffer.from(JSON.stringify(passJson))
-        };
-
-        if (logoBuffer) {
-            modelFiles["logo.png"] = logoBuffer;
-            modelFiles["icon.png"] = logoBuffer;
-            modelFiles["logo@2x.png"] = logoBuffer;
-            modelFiles["icon@2x.png"] = logoBuffer;
-        }
-
-        // 5. Instanciar usando PKPass.from() (Forma más segura en v3)
+        // ESTRATEGIA DEFINITIVA: Usar el Factory estático PKPass.from con Buffers
+        // Esto evita errores de validación de rutas y asegura que el prototipo esté bien inyectado.
         const pass = await PKPass.from({
-            model: modelFiles,
+            modelBuffers: {
+                "pass.json": Buffer.from(JSON.stringify(passJson)),
+                "icon.png": finalIcon,
+                "icon@2x.png": finalIcon,
+                "logo.png": finalIcon,
+                "logo@2x.png": finalIcon
+            },
             certificates: {
-                wwdr: wwdr,
+                wwdr,
                 signerCert: signer,
                 signerKey: signer,
                 signerKeyPassphrase: password
             }
         });
 
-        // 6. Exportar
-        const buffer = await pass.export();
+        // Verificación de seguridad antes de llamar al método
+        if (typeof pass.asBuffer !== "function") {
+            throw new Error("La instancia de PKPass no se creó correctamente (asBuffer missing).");
+        }
+
+        const buffer = pass.asBuffer();
         
         res.setHeader("Content-Type", "application/vnd.apple.pkpass");
         res.setHeader("Content-Disposition", `attachment; filename=pass_${cid}.pkpass`);
         return res.status(200).send(buffer);
 
     } catch (error) {
-        console.error("FATAL ERROR:", error);
-        res.status(500).send(`Error: ${error.message}`);
+        console.error("APPLE PASS ERROR:", error);
+        res.status(500).send(`Error de generación: ${error.message}`);
     }
 });
 
-/** GOOGLE WALLET **/
+// ... resto de las funciones de Google Wallet y Firestore (sin cambios)
+async function loadServiceAccount() {
+  const saPath = path.join(__dirname, "service-account-key.json");
+  try {
+    if (existsSync(saPath)) {
+      return JSON.parse(readFileSync(saPath, "utf8"));
+    }
+  } catch (err) { console.error("SA Load Error:", err.message); }
+  return null;
+}
+
 async function getGoogleAuthToken() {
-  const sa = loadServiceAccount();
+  const sa = await loadServiceAccount();
   if (!sa) throw new Error("SA missing");
   const auth = new GoogleAuth({
     credentials: {
@@ -185,68 +176,85 @@ export const generatewalletpass = onRequest({
     memory: "256MiB"
 }, async (req, res) => {
   const { bid, cid } = req.query;
+  if (!bid || !cid) return res.status(400).send("Faltan parámetros.");
   try {
-    const sa = loadServiceAccount();
-    const [customerSnap, bizSnap, bizCardSnap] = await Promise.all([
-        db.doc(`businesses/${bid}/customers/${cid}`).get(),
+    const sa = await loadServiceAccount();
+    if (!sa) throw new Error("SA Key missing");
+    const [businessCardSnap, businessMainSnap, customerSnap] = await Promise.all([
+        db.doc(`businesses/${bid}/config/card`).get(),
         db.doc(`businesses/${bid}`).get(),
-        db.doc(`businesses/${bid}/config/card`).get()
+        db.doc(`businesses/${bid}/customers/${cid}`).get()
     ]);
-    
-    if (!customerSnap.exists) return res.status(404).send("No customer");
-    
-    const bizData = bizSnap.data();
-    const cardData = bizCardSnap.data() || {};
+    if (!customerSnap.exists) return res.status(404).send("Cliente no encontrado");
+    const businessCardData = businessCardSnap.exists ? businessCardSnap.data() : {};
+    const businessMainData = businessMainSnap.exists ? businessMainSnap.data() : {};
     const customerData = customerSnap.data();
-
+    const bizName = (businessCardData.name || businessMainData.name || "Loyalfly").substring(0, 20);
+    const custName = (customerData.name || "Cliente").substring(0, 25);
+    const stamps = customerData.stamps || 0;
+    const rewards = customerData.rewardsRedeemed || 0;
     const safeBid = bid.replace(/[^a-zA-Z0-9]/g, '');
     const safeCid = cid.replace(/[^a-zA-Z0-9]/g, '');
+    const classId = `${ISSUER_ID}.V30_${safeBid}`;
     const objectId = `${ISSUER_ID}.OBJ_${safeBid}_${safeCid}`;
-
+    let cardColor = businessCardData.color || "#5134f9";
+    if (!cardColor.startsWith('#')) cardColor = `#${cardColor}`;
+    let logoObj = undefined;
+    const rawLogo = businessCardData.logoUrl || "https://res.cloudinary.com/dg4wbuppq/image/upload/v1762622899/ico_loyalfly_xgfdv8.png";
+    if (rawLogo.startsWith('http')) {
+        let cleanLogo = rawLogo;
+        if (cleanLogo.includes('cloudinary.com')) cleanLogo = cleanLogo.replace('.svg', '.png');
+        logoObj = { sourceUri: { uri: cleanLogo }, contentDescription: { defaultValue: { language: "es-419", value: "Logo" } } };
+    }
+    const genericClass = { id: classId, issuerName: bizName };
     const genericObject = {
-      id: objectId,
-      classId: `${ISSUER_ID}.V26_${safeBid}`,
-      hexBackgroundColor: cardData.color || "#5134f9",
-      cardTitle: { defaultValue: { language: "es-419", value: cardData.name || bizData.name } },
-      header: { defaultValue: { language: "es-419", value: customerData.name } },
-      textModulesData: [{ id: "sellos", header: "Sellos", body: `${customerData.stamps || 0}` }],
-      barcode: { type: "QR_CODE", value: cid }
+      id: objectId, classId: classId, hexBackgroundColor: cardColor, logo: logoObj,
+      cardTitle: { defaultValue: { language: "es-419", value: bizName } },
+      header: { defaultValue: { language: "es-419", value: custName } },
+      subheader: { defaultValue: { language: "es-419", value: "Nombre" } },
+      textModulesData: [
+        { id: "sellos", header: "Sellos acumulados", body: String(stamps) },
+        { id: "recompensas", header: "Recompensas", body: String(rewards) }
+      ],
+      barcode: { type: "QR_CODE", value: cid, alternateText: String(customerData.phone || cid.substring(0, 8)) }
     };
-
-    const claims = {
-      iss: sa.client_email,
-      aud: "google",
-      typ: "savetowallet",
-      payload: { genericObjects: [genericObject] },
-    };
-
+    const claims = { iss: sa.client_email, aud: "google", typ: "savetowallet", payload: { genericClasses: [genericClass], genericObjects: [genericObject] } };
     const token = jwt.sign(claims, sa.private_key.replace(/\\n/g, '\n'), { algorithm: "RS256" });
     res.redirect(`https://pay.google.com/gp/v/save/${token}`);
   } catch (e) {
-    res.status(500).send(e.message);
+    console.error("GOOGLE WALLET ERROR:", e);
+    res.status(500).send(`Error: ${e.message}`);
   }
 });
 
 export const updatewalletonstampchange = onDocumentUpdated({
     document: "businesses/{bid}/customers/{cid}",
-    memory: "256MiB"
+    memory: "256MiB",
+    retry: true
 }, async (event) => {
     const newData = event.data.after.data();
     const oldData = event.data.before.data();
-    if (newData.stamps === oldData.stamps) return null;
+    if (newData.stamps === oldData.stamps && newData.rewardsRedeemed === oldData.rewardsRedeemed && newData.name === oldData.name) return null;
     const { bid, cid } = event.params;
+    const safeBid = bid.replace(/[^a-zA-Z0-9]/g, '');
+    const safeCid = cid.replace(/[^a-zA-Z0-9]/g, '');
+    const objectId = `${ISSUER_ID}.OBJ_${safeBid}_${safeCid}`;
     try {
       const token = await getGoogleAuthToken();
-      const safeBid = bid.replace(/[^a-zA-Z0-9]/g, '');
-      const safeCid = cid.replace(/[^a-zA-Z0-9]/g, '');
-      const objectId = `${ISSUER_ID}.OBJ_${safeBid}_${safeCid}`;
+      const stamps = newData.stamps || 0;
+      const rewards = newData.rewardsRedeemed || 0;
+      const custName = (newData.name || "Cliente").substring(0, 25);
       await fetch(`https://walletobjects.googleapis.com/walletobjects/v1/genericObject/${objectId}`, {
           method: 'PATCH',
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
           body: JSON.stringify({
-            textModulesData: [{ id: "sellos", header: "Sellos", body: `${newData.stamps || 0}` }]
+            header: { defaultValue: { language: "es-419", value: custName } },
+            textModulesData: [
+                { id: "sellos", header: "Sellos acumulados", body: String(stamps) },
+                { id: "recompensas", header: "Recompensas", body: String(rewards) }
+            ]
           })
       });
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error("PATCH Error:", e.message); }
     return null;
 });
