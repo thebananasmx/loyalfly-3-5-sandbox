@@ -1,40 +1,32 @@
 import { onRequest } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import admin from "firebase-admin";
-import { PKPass } from "passkit-generator";
+import { PKPass } from "passkit-generator"; // Importación corregida para Node 20 ESM
 
 admin.initializeApp();
 const db = admin.firestore();
 
-// Secretos
+// Definición de Secretos
 const APPLE_PASS_CERT_BASE64 = defineSecret("APPLE_PASS_CERT_BASE64");
 const APPLE_PASS_PASSWORD = defineSecret("APPLE_PASS_PASSWORD");
 const APPLE_WWDR_CERT_BASE64 = defineSecret("APPLE_WWDR_CERT_BASE64");
 
 /**
- * Procesa el secreto y audita su contenido
+ * Función de auditoría para verificar la integridad de los secretos
  */
-function processSecret(name, value) {
-    let str = value?.toString().trim() || "";
-    if (!str) {
-        console.error(`[Audit] ${name} está TOTALMENTE VACÍO.`);
-        return null;
-    }
+function auditSecret(name, value) {
+    const str = value?.toString().trim() || "";
+    if (!str) return null;
     
     let buffer;
     if (str.includes("-----BEGIN")) {
         buffer = Buffer.from(str, "utf-8");
     } else {
-        const cleanStr = str.replace(/[^A-Za-z0-9+/=]/g, "");
-        buffer = Buffer.from(cleanStr, "base64");
+        buffer = Buffer.from(str.replace(/[^A-Za-z0-9+/=]/g, ""), "base64");
     }
-
-    const decodedText = buffer.toString("utf-8");
-    const hasCert = decodedText.includes("BEGIN CERTIFICATE");
-    const hasKey = decodedText.includes("BEGIN PRIVATE KEY") || decodedText.includes("BEGIN RSA PRIVATE KEY");
     
-    console.log(`[Audit] ${name} -> Cert: ${hasCert ? "SI" : "NO"}, Llave: ${hasKey ? "SI" : "NO"}`);
-    
+    const content = buffer.toString("utf-8");
+    console.log(`[Audit] ${name}: Cert=${content.includes("BEGIN CERTIFICATE")}, Key=${content.includes("PRIVATE KEY")}`);
     return buffer;
 }
 
@@ -46,79 +38,65 @@ export const generateapplepass = onRequest({
     if (!bid || !cid) return res.status(400).send("Faltan parámetros bid/cid.");
 
     try {
-        console.log(`[ApplePass] Generando para Cliente: ${cid}`);
-
-        const [customerSnap, businessSnap] = await Promise.all([
+        // 1. Obtener datos de Firestore
+        const [custSnap, bizSnap] = await Promise.all([
             db.doc(`businesses/${bid}/customers/${cid}`).get(),
             db.doc(`businesses/${bid}`).get()
         ]);
 
-        if (!customerSnap.exists) return res.status(404).send("Cliente no existe.");
-        
-        const bizData = businessSnap.data();
-        const custData = customerSnap.data();
+        if (!custSnap.exists) return res.status(404).send("Cliente no existe.");
+        const biz = bizSnap.data();
+        const cust = custSnap.data();
 
-        // 1. Validar y procesar Certificados
-        const wwdr = processSecret("WWDR_CERT", APPLE_WWDR_CERT_BASE64.value());
-        const signer = processSecret("SIGNER_CERT", APPLE_PASS_CERT_BASE64.value());
-        const password = APPLE_PASS_PASSWORD.value()?.toString().trim();
+        // 2. Procesar Certificados (Auditoría incluida)
+        const wwdr = auditSecret("WWDR", APPLE_WWDR_CERT_BASE64.value());
+        const signer = auditSecret("SIGNER", APPLE_PASS_CERT_BASE64.value());
+        const pass = APPLE_PASS_PASSWORD.value()?.toString().trim();
 
-        if (!wwdr || !signer) {
-            throw new Error("Certificados no cargados correctamente.");
-        }
+        if (!wwdr || !signer) throw new Error("Certificados faltantes o inválidos.");
 
-        // 2. Preparar JSON del pase
+        // 3. Crear el JSON del pase
         const passJson = {
             formatVersion: 1,
             passTypeIdentifier: "pass.com.loyalfly.card",
             teamIdentifier: "8W9R78X846",
-            organizationName: bizData?.name || "Loyalfly",
-            description: `Tarjeta de lealtad de ${bizData?.name}`,
-            logoText: bizData?.name || "Loyalfly",
-            foregroundColor: "rgb(0,0,0)",
-            backgroundColor: "rgb(255,255,255)",
+            organizationName: biz?.name || "Loyalfly",
+            description: "Tarjeta de Lealtad",
             serialNumber: cid,
+            backgroundColor: "rgb(255,255,255)",
+            foregroundColor: "rgb(0,0,0)",
             storeCard: {
-                primaryFields: [{ key: "stamps", label: "SELLOS", value: String(custData?.stamps || 0) }],
-                secondaryFields: [{ key: "customer", label: "CLIENTE", value: custData?.name || "Cliente" }]
+                primaryFields: [{ key: "stamps", label: "SELLOS", value: String(cust?.stamps || 0) }],
+                secondaryFields: [{ key: "name", label: "CLIENTE", value: cust?.name || "Cliente" }]
             },
-            barcodes: [{
-                format: "PKBarcodeFormatQR",
-                message: cid,
-                messageEncoding: "iso-8859-1"
-            }]
+            barcodes: [{ format: "PKBarcodeFormatQR", message: cid, messageEncoding: "iso-8859-1" }]
         };
 
-        // 3. Definir Buffers (Archivos del pase)
-        // Imagen de 1x1 transparente como placeholder
+        // 4. Generar el archivo .pkpass
+        // Nota: passkit-generator v3 requiere los buffers de imagen obligatorios
         const dot = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64");
         
-        const buffers = {
+        const instance = new PKPass({
             "pass.json": Buffer.from(JSON.stringify(passJson)),
             "icon.png": dot,
             "icon@2x.png": dot,
             "logo.png": dot
-        };
-
-        // 4. Instanciar PKPass
-        // Usamos la clase PKPass importada directamente
-        const pass = new PKPass(buffers, {
-            wwdr: wwdr,
+        }, {
+            wwdr,
             signerCert: signer,
             signerKey: signer,
-            signerKeyPassphrase: password
+            signerKeyPassphrase: pass
         });
 
-        // 5. Generar Buffer final
-        const buffer = await pass.asBuffer(); 
+        const output = await instance.asBuffer();
 
-        console.log("[ApplePass] ¡Pase generado correctamente!");
+        console.log(`[Success] Pase generado para ${cust.name}`);
         res.setHeader("Content-Type", "application/vnd.apple.pkpass");
-        res.setHeader("Content-Disposition", `attachment; filename=pass.pkpass`);
-        return res.status(200).send(buffer);
+        res.setHeader("Content-Disposition", "attachment; filename=card.pkpass");
+        return res.status(200).send(output);
 
     } catch (e) {
-        console.error("[ApplePass] ERROR:", e.message);
+        console.error("[Error Crítico]", e.message);
         return res.status(500).send(`Error: ${e.message}`);
     }
 });
