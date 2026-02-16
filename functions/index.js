@@ -1,3 +1,4 @@
+
 import { onRequest } from "firebase-functions/v2/https";
 import { onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { defineSecret } from "firebase-functions/params";
@@ -70,7 +71,7 @@ export const generateapplepass = onRequest({
     secrets: [APPLE_PASS_CERT_BASE64, APPLE_PASS_PASSWORD, APPLE_WWDR_CERT_BASE64],
     memory: "512MiB",
     timeoutSeconds: 30,
-    invoker: "public" // PERMITE ACCESO PÚBLICO DESDE NAVEGADORES
+    invoker: "public"
 }, async (req, res) => {
     try {
         const { bid, cid } = req.query;
@@ -98,8 +99,10 @@ export const generateapplepass = onRequest({
         const bgColor = cardSettings.color || "rgb(81, 52, 249)";
         const isLightScheme = cardSettings.textColorScheme === 'light';
         const fgColor = isLightScheme ? "rgb(255, 255, 255)" : "rgb(0, 0, 0)";
-        const labelColor = isLightScheme ? "rgb(255, 255, 255)" : "rgb(50, 50, 50)";
+        const labelColor = isLightScheme ? "rgb(255, 255, 255)" : "rgb(100, 100, 100)";
 
+        // En passkit-generator v3, los campos se pasan al nivel superior de las opciones
+        // y la librería los mapea automáticamente al estilo definido en el model (storeCard)
         const pass = await PKPass.from({
             model: path.resolve("model.pass"),
             certificates: { wwdr: wwdrPem, signerCert: certPart, signerKey: keyPart, signerKeyPassphrase: password }
@@ -110,29 +113,73 @@ export const generateapplepass = onRequest({
             backgroundColor: bgColor,
             foregroundColor: fgColor,
             labelColor: labelColor,
-            logoText: business.name || "Loyalfly",
-            storeCard: {
-                headerFields: [{ key: "stamps", label: "SELLOS", value: `${customer.stamps || 0}/10`, textAlignment: "PKTextAlignmentRight" }],
-                primaryFields: [{ key: "name", label: "CLIENTE", value: customer.name || "Miembro" }],
-                secondaryFields: [{ key: "reward", label: "PRÓXIMO PREMIO", value: cardSettings.reward || "Recompensa" }],
-                auxiliaryFields: [{ key: "phone", label: "TELÉFONO", value: customer.phone || "-" }]
-            }
+            logoText: (cardSettings.name || business.name || "Loyalfly").toUpperCase(),
+            // Definir campos directamente aquí evita el error .add() y asegura el merge correcto
+            headerFields: [
+                { 
+                    key: "stamps", 
+                    label: "SELLOS", 
+                    value: String(customer.stamps || 0), 
+                    textAlignment: "PKTextAlignmentRight" 
+                }
+            ],
+            primaryFields: [
+                { 
+                    key: "name", 
+                    label: "CLIENTE", 
+                    value: (customer.name || "Miembro").toUpperCase()
+                }
+            ],
+            secondaryFields: [
+                { 
+                    key: "rewards", 
+                    label: "RECOMPENSAS", 
+                    value: String(customer.rewardsRedeemed || 0) 
+                },
+                { 
+                    key: "prize", 
+                    label: "PREMIO", 
+                    value: String(cardSettings.reward || "Recompensa") 
+                }
+            ],
+            auxiliaryFields: [
+                { 
+                    key: "phone", 
+                    label: "TELÉFONO", 
+                    value: String(customer.phone || "-") 
+                }
+            ]
         });
 
-        pass.setBarcodes({ format: "PKBarcodeFormatQR", message: cid, messageEncoding: "iso-8859-1" });
+        // Configurar código QR
+        pass.setBarcodes({ 
+            format: "PKBarcodeFormatQR", 
+            message: cid, 
+            messageEncoding: "iso-8859-1",
+            altText: "Escanea para sumar sellos"
+        });
+
+        // PUNTOS 1 Y 2: Multi-resolución de imágenes
+        // Inyectamos el mismo buffer para todas las variantes de resolución
+        // Esto obliga a iOS a usar la imagen dinámica y no la del model.pass
+        const imageFiles = ["icon.png", "icon@2x.png", "icon@3x.png", "logo.png", "logo@2x.png", "logo@3x.png"];
 
         if (cardSettings.logoUrl) {
             try {
                 const response = await fetch(cardSettings.logoUrl);
                 if (response.ok) {
                     const logoBuffer = Buffer.from(await response.arrayBuffer());
-                    pass.addBuffer("logo.png", logoBuffer);
-                    pass.addBuffer("icon.png", logoBuffer);
+                    imageFiles.forEach(name => pass.addBuffer(name, logoBuffer));
+                } else {
+                    console.warn(`[APPLE] Logo URL retornó ${response.status}. Usando píxel transparente.`);
+                    imageFiles.forEach(name => pass.addBuffer(name, PIXEL));
                 }
-            } catch (err) { console.warn("Error logo Apple:", err.message); }
+            } catch (err) { 
+                console.error("[APPLE] Error descargando logo:", err.message); 
+                imageFiles.forEach(name => pass.addBuffer(name, PIXEL));
+            }
         } else {
-            pass.addBuffer("icon.png", PIXEL);
-            pass.addBuffer("logo.png", PIXEL);
+            imageFiles.forEach(name => pass.addBuffer(name, PIXEL));
         }
 
         const buffer = await pass.getAsBuffer();
@@ -140,6 +187,7 @@ export const generateapplepass = onRequest({
         res.setHeader("Content-Disposition", `attachment; filename=loyalfly-${cid}.pkpass`);
         return res.status(200).send(buffer);
     } catch (e) {
+        console.error("ERROR GENERATING APPLE PASS:", e);
         return res.status(500).send(`Error Apple Pass: ${e.message}`);
     }
 });
@@ -151,7 +199,7 @@ export const generatewalletpass = onRequest({
     region: "us-central1",
     memory: "256MiB",
     maxInstances: 10,
-    invoker: "public" // PERMITE ACCESO PÚBLICO DESDE NAVEGADORES
+    invoker: "public"
 }, async (req, res) => {
     try {
         const { bid, cid } = req.query;
@@ -172,12 +220,11 @@ export const generatewalletpass = onRequest({
         const bizName = (cardSettings.name || business.name || "Loyalfly").substring(0, 20);
         const custName = (customer.name || "Cliente").substring(0, 25);
         const stamps = customer.stamps || 0;
-        const rewardsAvailable = Math.floor(stamps / 10);
+        const rewardsAvailable = customer.rewardsRedeemed || 0;
 
         const safeBid = bid.replace(/[^a-zA-Z0-9]/g, '');
         const safeCid = cid.replace(/[^a-zA-Z0-9]/g, '');
         
-        // IMPORTANTE: Actualmente en V31 para evitar que la wallet tome versiones viejas o cacheadas
         const classId = `${ISSUER_ID}.V31_${safeBid}`;
         const objectId = `${ISSUER_ID}.OBJ_${safeBid}_${safeCid}`;
 
@@ -251,7 +298,7 @@ export const updatewalletonstampchange = onDocumentUpdated({
     const newData = event.data.after.data();
     const oldData = event.data.before.data();
 
-    if (newData.stamps === oldData.stamps && newData.name === oldData.name) return null;
+    if (newData.stamps === oldData.stamps && newData.name === oldData.name && newData.rewardsRedeemed === oldData.rewardsRedeemed) return null;
 
     const { bid, cid } = event.params;
     const safeBid = bid.replace(/[^a-zA-Z0-9]/g, '');
@@ -261,7 +308,7 @@ export const updatewalletonstampchange = onDocumentUpdated({
     try {
         const token = await getGoogleAuthToken();
         const stamps = newData.stamps || 0;
-        const rewards = Math.floor(stamps / 10);
+        const rewards = newData.rewardsRedeemed || 0;
         const custName = (newData.name || "Cliente").substring(0, 25);
 
         const patchData = {
