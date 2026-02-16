@@ -21,10 +21,12 @@ const APPLE_WWDR_CERT_BASE64 = defineSecret("APPLE_WWDR_CERT_BASE64");
 
 // --- CONFIGURACIÓN GOOGLE WALLET ---
 const ISSUER_ID = "3388000000023072020";
-// Nota: Asegúrate de que este archivo esté en la carpeta functions/
-const serviceAccount = JSON.parse(readFileSync("./service-account-key.json", "utf-8"));
-
-const PIXEL = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64");
+let serviceAccount;
+try {
+    serviceAccount = JSON.parse(readFileSync("./service-account-key.json", "utf-8"));
+} catch (e) {
+    console.warn("Google Service Account not found.");
+}
 
 // --- HELPERS GENERALES ---
 function extractPemBlock(pemText, blockName) {
@@ -44,22 +46,6 @@ function getPemFromSecret(secretValue, label) {
         console.error(`[LOG] Error decodificando secreto ${label}:`, e.message);
         return null;
     }
-}
-
-/**
- * Obtiene token de acceso para Google Wallet API
- */
-async function getGoogleAuthToken() {
-    const auth = new GoogleAuth({
-        credentials: {
-            client_email: serviceAccount.client_email,
-            private_key: serviceAccount.private_key.replace(/\\n/g, '\n'),
-        },
-        scopes: ["https://www.googleapis.com/auth/wallet_object.issuer"],
-    });
-    const client = await auth.getClient();
-    const token = await client.getAccessToken();
-    return token.token;
 }
 
 // ==========================================
@@ -110,44 +96,14 @@ export const generateapplepass = onRequest({
             backgroundColor: bgColor,
             foregroundColor: fgColor,
             labelColor: labelColor,
-            logoText: (cardSettings.name || business.name || "Loyalfly").toUpperCase(),
-            storeCard: {
-                headerFields: [
-                    { 
-                        key: "stamps", 
-                        label: "SELLOS", 
-                        value: String(customer.stamps || 0), 
-                        textAlignment: "PKTextAlignmentRight" 
-                    }
-                ],
-                primaryFields: [
-                    { 
-                        key: "name", 
-                        label: "CLIENTE", 
-                        value: customer.name || "Miembro" 
-                    }
-                ],
-                secondaryFields: [
-                    { 
-                        key: "rewards", 
-                        label: "RECOMPENSAS", 
-                        value: String(customer.rewardsRedeemed || 0) 
-                    },
-                    { 
-                        key: "prize", 
-                        label: "PREMIO", 
-                        value: cardSettings.reward || "Recompensa" 
-                    }
-                ],
-                auxiliaryFields: [
-                    { 
-                        key: "phone", 
-                        label: "TELÉFONO", 
-                        value: customer.phone || "-" 
-                    }
-                ]
-            }
+            logoText: (cardSettings.name || business.name || "Loyalfly").toUpperCase()
         });
+
+        // Campos de la tarjeta
+        pass.primaryFields.add({ key: "name", label: "CLIENTE", value: customer.name || "Miembro" });
+        pass.secondaryFields.add({ key: "stamps", label: "SELLOS", value: String(customer.stamps || 0) });
+        pass.secondaryFields.add({ key: "rewards", label: "PREMIOS", value: String(customer.rewardsRedeemed || 0) });
+        pass.auxiliaryFields.add({ key: "rewardText", label: "RECOMPENSA", value: cardSettings.reward || "Recompensa" });
 
         pass.setBarcodes({ 
             format: "PKBarcodeFormatQR", 
@@ -156,24 +112,26 @@ export const generateapplepass = onRequest({
             altText: "Escanea para sumar sellos"
         });
 
-        // Solo icon y logo. strip.png se omite para que use el archivo físico de model.pass
-        const imageFiles = ["icon.png", "icon@2x.png", "icon@3x.png", "logo.png", "logo@2x.png", "logo@3x.png"];
+        // --- MANEJO DE IMÁGENES (LOGO, ICON Y STRIP) ---
+        // Definimos los grupos de archivos para Apple Wallet
+        const imageAssets = [
+            { url: cardSettings.logoUrl, names: ["logo.png", "logo@2x.png", "logo@3x.png", "icon.png", "icon@2x.png", "icon@3x.png"] },
+            { url: cardSettings.stripUrl || cardSettings.logoUrl, names: ["strip.png", "strip@2x.png", "strip@3x.png"] }
+        ];
 
-        if (cardSettings.logoUrl) {
-            try {
-                const response = await fetch(cardSettings.logoUrl);
-                if (response.ok) {
-                    const logoBuffer = Buffer.from(await response.arrayBuffer());
-                    imageFiles.forEach(name => pass.addBuffer(name, logoBuffer));
-                } else {
-                    imageFiles.forEach(name => pass.addBuffer(name, PIXEL));
+        for (const asset of imageAssets) {
+            if (asset.url) {
+                try {
+                    const response = await fetch(asset.url);
+                    if (response.ok) {
+                        const imageBuffer = Buffer.from(await response.arrayBuffer());
+                        // "Llamamos" y añadimos cada archivo al paquete .pkpass
+                        asset.names.forEach(fileName => pass.addBuffer(fileName, imageBuffer));
+                    }
+                } catch (err) {
+                    console.warn(`Error cargando imagen desde ${asset.url}:`, err.message);
                 }
-            } catch (err) { 
-                console.warn("Error logo Apple:", err.message); 
-                imageFiles.forEach(name => pass.addBuffer(name, PIXEL));
             }
-        } else {
-            imageFiles.forEach(name => pass.addBuffer(name, PIXEL));
         }
 
         const buffer = await pass.getAsBuffer();
@@ -181,6 +139,7 @@ export const generateapplepass = onRequest({
         res.setHeader("Content-Disposition", `attachment; filename=loyalfly-${cid}.pkpass`);
         return res.status(200).send(buffer);
     } catch (e) {
+        console.error("Error Apple Pass:", e);
         return res.status(500).send(`Error Apple Pass: ${e.message}`);
     }
 });
@@ -195,8 +154,10 @@ export const generatewalletpass = onRequest({
     invoker: "public"
 }, async (req, res) => {
     try {
+        if (!serviceAccount) return res.status(500).send("Google Wallet credentials missing.");
+        
         const { bid, cid } = req.query;
-        if (!bid || !cid) return res.status(400).send("Faltan parámetros bid o cid.");
+        if (!bid || !cid) return res.status(400).send("Faltan bid o cid.");
 
         const [busMainSnap, cardSnap, custSnap] = await Promise.all([
             db.doc(`businesses/${bid}`).get(),
@@ -217,7 +178,6 @@ export const generatewalletpass = onRequest({
 
         const safeBid = bid.replace(/[^a-zA-Z0-9]/g, '');
         const safeCid = cid.replace(/[^a-zA-Z0-9]/g, '');
-        
         const classId = `${ISSUER_ID}.V31_${safeBid}`;
         const objectId = `${ISSUER_ID}.OBJ_${safeBid}_${safeCid}`;
 
@@ -226,10 +186,8 @@ export const generatewalletpass = onRequest({
 
         let logoObj = undefined;
         if (cardSettings.logoUrl) {
-            let cleanLogo = cardSettings.logoUrl;
-            if (cleanLogo.includes('cloudinary.com')) cleanLogo = cleanLogo.replace('.svg', '.png');
             logoObj = {
-                sourceUri: { uri: cleanLogo },
+                sourceUri: { uri: cardSettings.logoUrl.replace('.svg', '.png') },
                 contentDescription: { defaultValue: { language: "es-419", value: "Logo" } }
             };
         }
@@ -256,7 +214,7 @@ export const generatewalletpass = onRequest({
             logo: logoObj,
             cardTitle: { defaultValue: { language: "es-419", value: bizName } },
             header: { defaultValue: { language: "es-419", value: custName } },
-            subheader: { defaultValue: { language: "es-419", value: `Nombre` } },
+            subheader: { defaultValue: { language: "es-419", value: "Nombre" } },
             textModulesData: [
                 { id: "sellos", header: "Sellos acumulados", body: `${stamps}` },
                 { id: "recompensas", header: "Recompensas", body: `${rewardsAvailable}` }
@@ -290,7 +248,6 @@ export const updatewalletonstampchange = onDocumentUpdated({
 }, async (event) => {
     const newData = event.data.after.data();
     const oldData = event.data.before.data();
-
     if (newData.stamps === oldData.stamps && newData.name === oldData.name && newData.rewardsRedeemed === oldData.rewardsRedeemed) return null;
 
     const { bid, cid } = event.params;
@@ -299,29 +256,27 @@ export const updatewalletonstampchange = onDocumentUpdated({
     const objectId = `${ISSUER_ID}.OBJ_${safeBid}_${safeCid}`;
 
     try {
-        const token = await getGoogleAuthToken();
-        const stamps = newData.stamps || 0;
-        const rewards = newData.rewardsRedeemed || 0;
-        const custName = (newData.name || "Cliente").substring(0, 25);
+        const auth = new GoogleAuth({
+            credentials: { client_email: serviceAccount.client_email, private_key: serviceAccount.private_key.replace(/\\n/g, '\n') },
+            scopes: ["https://www.googleapis.com/auth/wallet_object.issuer"],
+        });
+        const client = await auth.getClient();
+        const tokenResponse = await client.getAccessToken();
+        const token = tokenResponse.token;
 
         const patchData = {
-            header: { defaultValue: { language: "es-419", value: custName } },
+            header: { defaultValue: { language: "es-419", value: (newData.name || "Cliente").substring(0, 25) } },
             textModulesData: [
-                { id: "sellos", header: "Sellos acumulados", body: `${stamps}` },
-                { id: "recompensas", header: "Recompensas", body: `${rewards}` }
+                { id: "sellos", header: "Sellos acumulados", body: `${newData.stamps || 0}` },
+                { id: "recompensas", header: "Recompensas", body: `${newData.rewardsRedeemed || 0}` }
             ]
         };
 
-        const response = await fetch(`https://walletobjects.googleapis.com/walletobjects/v1/genericObject/${objectId}`, {
+        await fetch(`https://walletobjects.googleapis.com/walletobjects/v1/genericObject/${objectId}`, {
             method: 'PATCH',
             headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
             body: JSON.stringify(patchData)
         });
-
-        if (!response.ok && response.status !== 404) {
-            const errorData = await response.json();
-            throw new Error(JSON.stringify(errorData));
-        }
     } catch (error) {
         console.error("Error actualizando Google Wallet:", error.message);
     }
