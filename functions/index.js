@@ -99,21 +99,27 @@ export const generateapplepass = onRequest({
             logoText: (cardSettings.name || business.name || "Loyalfly").toUpperCase()
         });
 
-        // --- CORRECCIÓN: Los campos son ARRAYS, usamos .push() ---
-        pass.primaryFields.push({ key: "name", label: "CLIENTE", value: customer.name || "Miembro" });
+        // --- CONFIGURACIÓN DE CAMPOS ---
+        // "name colocalo en un secondary field"
+        pass.secondaryFields.push({ key: "name", label: "CLIENTE", value: customer.name || "Miembro" });
+        
+        // El campo de sellos se mantiene en secondary para visibilidad
         pass.secondaryFields.push({ key: "stamps", label: "SELLOS", value: String(customer.stamps || 0) });
-        pass.secondaryFields.push({ key: "rewards", label: "PREMIOS", value: String(customer.rewardsRedeemed || 0) });
+        
+        // "los premios rewards dejalos en un campo atras de la tarjeta"
+        pass.backFields.push({ key: "rewards", label: "PREMIOS CANJEADOS", value: String(customer.rewardsRedeemed || 0) });
+        
+        // Texto de recompensa en auxiliary (frontal)
         pass.auxiliaryFields.push({ key: "rewardText", label: "RECOMPENSA", value: cardSettings.reward || "Recompensa" });
 
         pass.setBarcodes({ 
             format: "PKBarcodeFormatQR", 
             message: cid, 
             messageEncoding: "iso-8859-1",
-            altText: "Escanea para sumar sellos"
+            altText: "Escanea, suma sellos"
         });
 
         // --- MANEJO EXPLÍCITO DE IMÁGENES (STRIP Y LOGO) ---
-        // Apple requiere strip.png para el banner de storeCard
         const imageAssets = [
             { url: cardSettings.logoUrl, names: ["logo.png", "logo@2x.png", "logo@3x.png", "icon.png", "icon@2x.png", "icon@3x.png"] },
             { url: cardSettings.stripUrl || cardSettings.logoUrl, names: ["strip.png", "strip@2x.png", "strip@3x.png"] }
@@ -125,7 +131,6 @@ export const generateapplepass = onRequest({
                     const response = await fetch(asset.url);
                     if (response.ok) {
                         const imageBuffer = Buffer.from(await response.arrayBuffer());
-                        // Inyectamos las imágenes en el paquete
                         asset.names.forEach(fileName => pass.addBuffer(fileName, imageBuffer));
                     }
                 } catch (err) {
