@@ -140,7 +140,8 @@ export const generateapplepass = onRequest({
 
         const buffer = await pass.getAsBuffer();
         res.setHeader("Content-Type", "application/vnd.apple.pkpass");
-        res.setHeader("Content-Disposition", "attachment; filename=loyalfly-${cid}.pkpass");
+        // CORRECCIÓN: Uso de backticks para incluir el cid en el nombre del archivo
+        res.setHeader("Content-Disposition", `attachment; filename="loyalfly-${cid}.pkpass"`);
         return res.status(200).send(buffer);
 
     } catch (e) {
@@ -190,7 +191,7 @@ export const generatewalletpass = onRequest({
             iss: serviceAccount.client_email,
             aud: "google",
             typ: "savetowallet",
-            payload: { genericClasses: [genericClass], genericObjects: [genericObject] },
+            payload: { genericObjects: [genericObject] },
         };
 
         const token = jwt.sign(claims, serviceAccount.private_key.replace(/\\n/g, '\n'), { algorithm: "RS256" });
