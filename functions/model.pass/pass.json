@@ -4,7 +4,5 @@
   "teamIdentifier": "KWQ7439H65",
   "organizationName": "Loyalfly",
   "description": "Tarjeta de Lealtad Loyalfly",
-  "storeCard": {
-    "primaryFields": []
-  }
+  "storeCard": {}
 }
