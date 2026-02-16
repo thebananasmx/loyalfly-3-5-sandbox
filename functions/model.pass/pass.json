@@ -1,9 +1,9 @@
 {
   "formatVersion": 1,
-  "passTypeIdentifier": "pass.com.loyalfly.card",
-  "teamIdentifier": "8W9R78X846",
+  "passTypeIdentifier": "pass.com.loyalfly.v2",
+  "teamIdentifier": "KWQ7439H65",
   "organizationName": "Loyalfly",
-  "description": "Loyalfly Loyalty Card",
+  "description": "Tarjeta de Lealtad Loyalfly",
   "storeCard": {
     "primaryFields": []
   }
