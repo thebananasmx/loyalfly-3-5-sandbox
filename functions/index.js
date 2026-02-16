@@ -99,11 +99,11 @@ export const generateapplepass = onRequest({
             logoText: (cardSettings.name || business.name || "Loyalfly").toUpperCase()
         });
 
-        // Campos de la tarjeta
-        pass.primaryFields.add({ key: "name", label: "CLIENTE", value: customer.name || "Miembro" });
-        pass.secondaryFields.add({ key: "stamps", label: "SELLOS", value: String(customer.stamps || 0) });
-        pass.secondaryFields.add({ key: "rewards", label: "PREMIOS", value: String(customer.rewardsRedeemed || 0) });
-        pass.auxiliaryFields.add({ key: "rewardText", label: "RECOMPENSA", value: cardSettings.reward || "Recompensa" });
+        // --- CORRECCIÓN: Los campos son ARRAYS, usamos .push() ---
+        pass.primaryFields.push({ key: "name", label: "CLIENTE", value: customer.name || "Miembro" });
+        pass.secondaryFields.push({ key: "stamps", label: "SELLOS", value: String(customer.stamps || 0) });
+        pass.secondaryFields.push({ key: "rewards", label: "PREMIOS", value: String(customer.rewardsRedeemed || 0) });
+        pass.auxiliaryFields.push({ key: "rewardText", label: "RECOMPENSA", value: cardSettings.reward || "Recompensa" });
 
         pass.setBarcodes({ 
             format: "PKBarcodeFormatQR", 
@@ -112,8 +112,8 @@ export const generateapplepass = onRequest({
             altText: "Escanea para sumar sellos"
         });
 
-        // --- MANEJO DE IMÁGENES (LOGO, ICON Y STRIP) ---
-        // Definimos los grupos de archivos para Apple Wallet
+        // --- MANEJO EXPLÍCITO DE IMÁGENES (STRIP Y LOGO) ---
+        // Apple requiere strip.png para el banner de storeCard
         const imageAssets = [
             { url: cardSettings.logoUrl, names: ["logo.png", "logo@2x.png", "logo@3x.png", "icon.png", "icon@2x.png", "icon@3x.png"] },
             { url: cardSettings.stripUrl || cardSettings.logoUrl, names: ["strip.png", "strip@2x.png", "strip@3x.png"] }
@@ -125,7 +125,7 @@ export const generateapplepass = onRequest({
                     const response = await fetch(asset.url);
                     if (response.ok) {
                         const imageBuffer = Buffer.from(await response.arrayBuffer());
-                        // "Llamamos" y añadimos cada archivo al paquete .pkpass
+                        // Inyectamos las imágenes en el paquete
                         asset.names.forEach(fileName => pass.addBuffer(fileName, imageBuffer));
                     }
                 } catch (err) {
