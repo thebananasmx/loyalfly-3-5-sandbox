@@ -1,3 +1,4 @@
+
 {
   "name": "functions",
   "description": "Loyalfly Wallet Service",
@@ -11,7 +12,9 @@
     "firebase-functions": "^6.1.1",
     "passkit-generator": "^3.5.7",
     "jsonwebtoken": "^9.0.2",
-    "google-auth-library": "^9.14.1"
+    "google-auth-library": "^9.14.1",
+    "express": "^4.19.2",
+    "cors": "^2.8.5"
   },
   "private": true
 }
