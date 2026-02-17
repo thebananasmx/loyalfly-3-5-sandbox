@@ -31,22 +31,42 @@ try {
     console.warn("Google Service Account not found.");
 }
 
-// --- HELPERS GENERALES ---
+// --- HELPERS DE CERTIFICADOS ---
+
+/**
+ * Extrae un bloque PEM de forma segura buscando los delimitadores de inicio y fin.
+ */
 function extractPemBlock(pemText, blockName) {
     if (!pemText) return null;
-    const regex = new RegExp(`-----BEGIN ${blockName}-----([\\s\\S]*?)-----END ${blockName}-----`, 'i');
-    const match = pemText.match(regex);
-    return match ? match[0] : null;
+    const beginMarker = `-----BEGIN ${blockName}-----`;
+    const endMarker = `-----END ${blockName}-----`;
+    
+    const startIdx = pemText.indexOf(beginMarker);
+    const endIdx = pemText.indexOf(endMarker);
+    
+    if (startIdx !== -1 && endIdx !== -1) {
+        return pemText.substring(startIdx, endIdx + endMarker.length).trim();
+    }
+    return null;
 }
 
-function getPemFromSecret(secretValue, label) {
-    if (!secretValue) return null;
+/**
+ * Decodifica el secreto Base64 y extrae el certificado y la llave.
+ */
+function loadAppleIdentity(base64Secret) {
+    if (!base64Secret) return null;
     try {
-        const raw = secretValue.trim();
-        const decoded = Buffer.from(raw, "base64").toString("utf-8");
-        return decoded.includes("-----BEGIN") ? decoded : null;
+        const cleanBase64 = base64Secret.replace(/\s/g, '');
+        const fullPem = Buffer.from(cleanBase64, "base64").toString("utf-8");
+        
+        const cert = extractPemBlock(fullPem, "CERTIFICATE");
+        const key = extractPemBlock(fullPem, "PRIVATE KEY") || 
+                    extractPemBlock(fullPem, "RSA PRIVATE KEY") ||
+                    extractPemBlock(fullPem, "ENCRYPTED PRIVATE KEY");
+
+        return { cert, key };
     } catch (e) {
-        console.error(`[LOG] Error decodificando secreto ${label}:`, e.message);
+        console.error("[ID_LOADER] Error decodificando identidad:", e.message);
         return null;
     }
 }
@@ -64,7 +84,6 @@ async function createApplePassBuffer(bid, cid, secrets) {
     if (!busSnap.exists || !custSnap.exists) throw new Error("Not Found");
 
     const business = busSnap.data();
-    // CORRECCIÓN: .exists es una propiedad, no una función
     const cardSettings = cardSnap.exists ? cardSnap.data() : {};
     const customer = custSnap.data();
 
@@ -74,23 +93,28 @@ async function createApplePassBuffer(bid, cid, secrets) {
         await db.doc(`businesses/${bid}/customers/${cid}`).update({ appleAuthToken: authToken });
     }
 
-    const wwdrPem = getPemFromSecret(secrets.wwdr, "WWDR");
-    const fullSignerPem = getPemFromSecret(secrets.signer, "SIGNER");
+    const wwdrPem = Buffer.from(secrets.wwdr.replace(/\s/g, ''), "base64").toString("utf-8");
+    const identity = loadAppleIdentity(secrets.signer);
     const password = secrets.password || "";
 
-    const certPart = extractPemBlock(fullSignerPem, "CERTIFICATE");
-    const keyPart = extractPemBlock(fullSignerPem, "PRIVATE KEY") || extractPemBlock(fullSignerPem, "RSA PRIVATE KEY");
+    if (!identity || !identity.cert || !identity.key) {
+        throw new Error("Identidad de firma incompleta o corrupta.");
+    }
 
     const bgColor = cardSettings.color || "rgb(81, 52, 249)";
-    const isLightScheme = cardSettings.textColorScheme === 'light';
-    const fgColor = isLightScheme ? "rgb(255, 255, 255)" : "rgb(0, 0, 0)";
-    const labelColor = isLightScheme ? "rgb(255, 255, 255)" : "rgb(100, 100, 100)";
+    const fgColor = cardSettings.textColorScheme === 'light' ? "rgb(255, 255, 255)" : "rgb(0, 0, 0)";
+    const labelColor = cardSettings.textColorScheme === 'light' ? "rgb(255, 255, 255)" : "rgb(100, 100, 100)";
 
     const webServiceURL = `https://applepassapi-2idcsaj5va-uc.a.run.app/v1/api/${bid}`;
 
     const pass = await PKPass.from({
         model: path.resolve("model.pass"),
-        certificates: { wwdr: wwdrPem, signerCert: certPart, signerKey: keyPart, signerKeyPassphrase: password }
+        certificates: { 
+            wwdr: wwdrPem, 
+            signerCert: identity.cert, 
+            signerKey: identity.key, 
+            signerKeyPassphrase: password 
+        }
     }, {
         serialNumber: cid,
         authenticationToken: authToken, 
@@ -146,6 +170,7 @@ export const generateapplepass = onRequest({
         res.setHeader("Content-Disposition", `attachment; filename=loyalfly-${cid}.pkpass`);
         return res.status(200).send(buffer);
     } catch (e) {
+        console.error("[GENERATE_PASS] Error:", e.message);
         return res.status(500).send(`Error: ${e.message}`);
     }
 });
@@ -158,22 +183,18 @@ appleApp.post("/v1/api/:bid/v1/devices/:devId/registrations/:passType/:serial", 
     const { bid, devId, serial } = req.params;
     const { pushToken } = req.body;
     const authHeader = req.headers.authorization;
-    console.log(`[APPLE_REG] Registro de dispositivo ${devId} para cliente ${serial}`);
     try {
         const custRef = db.doc(`businesses/${bid}/customers/${serial}`);
         const custSnap = await custRef.get();
         if (!custSnap.exists || `ApplePass ${custSnap.data().appleAuthToken}` !== authHeader) {
-             console.warn(`[APPLE_REG] No autorizado o cliente inexistente: ${serial}`);
              return res.status(401).send();
         }
         await custRef.collection("appleDevices").doc(devId).set({ 
             pushToken, 
             registeredAt: admin.firestore.FieldValue.serverTimestamp() 
         });
-        console.log(`[APPLE_REG] Token guardado para ${serial}`);
         return res.status(201).send();
     } catch (e) { 
-        console.error(`[APPLE_REG] Error: ${e.message}`);
         return res.status(500).send(); 
     }
 });
@@ -181,7 +202,6 @@ appleApp.post("/v1/api/:bid/v1/devices/:devId/registrations/:passType/:serial", 
 appleApp.get("/v1/api/:bid/v1/passes/:passType/:serial", async (req, res) => {
     const { bid, serial } = req.params;
     const authHeader = req.headers.authorization;
-    console.log(`[APPLE_UPDATE] El dispositivo pide el pase actualizado para ${serial}`);
     try {
         const custSnap = await db.doc(`businesses/${bid}/customers/${serial}`).get();
         if (!custSnap.exists || `ApplePass ${custSnap.data().appleAuthToken}` !== authHeader) return res.status(401).send();
@@ -251,40 +271,56 @@ export const updatewalletonstampchange = onDocumentUpdated({
         const devicesSnap = await db.collection(`businesses/${bid}/customers/${cid}/appleDevices`).get();
         if (devicesSnap.empty) return null;
         
-        console.log(`[APPLE_PUSH] Enviando notificación a ${devicesSnap.size} dispositivos para el cliente ${cid}`);
-        
-        const fullSignerPem = getPemFromSecret(APPLE_PASS_CERT_BASE64.value(), "SIGNER");
-        const cert = extractPemBlock(fullSignerPem, "CERTIFICATE");
-        const key = extractPemBlock(fullSignerPem, "PRIVATE KEY") || extractPemBlock(fullSignerPem, "RSA PRIVATE KEY");
-        
+        const identity = loadAppleIdentity(APPLE_PASS_CERT_BASE64.value());
+        if (!identity || !identity.cert || !identity.key) {
+            console.error("[APPLE_PUSH] No se pudo cargar el certificado de APNs del secreto.");
+            return null;
+        }
+
+        const passphrase = APPLE_PASS_PASSWORD.value();
+
         for (const doc of devicesSnap.docs) {
             const { pushToken } = doc.data();
-            const client = http2.connect('https://api.push.apple.com:443');
+            const client = http2.connect('https://api.push.apple.com:443', {
+                cert: identity.cert,
+                key: identity.key,
+                passphrase: passphrase
+            });
+            
             const pushReq = client.request({
                 ':method': 'POST',
                 ':path': `/3/device/${pushToken}`,
                 'apns-topic': 'pass.com.loyalfly.v2',
                 'apns-push-type': 'background',
                 'apns-priority': '5'
-            }, { cert, key, passphrase: APPLE_PASS_PASSWORD.value() });
-            
-            pushReq.on('response', (h) => { 
-                if (h[':status'] === 200) {
-                    console.log(`[APPLE_PUSH] Éxito APNs para dispositivo en cliente ${cid}`);
-                } else {
-                    console.warn(`[APPLE_PUSH] Fallo APNs (${h[':status']}) para cliente ${cid}`);
-                }
             });
-            pushReq.end(JSON.stringify({}));
-            setTimeout(() => client.close(), 2500);
+            
+            pushReq.on('response', (headers) => { 
+                const status = headers[':status'];
+                let data = '';
+                pushReq.on('data', (chunk) => { data += chunk; });
+                pushReq.on('end', () => {
+                    if (status === 200) {
+                        console.log(`[APPLE_PUSH] Éxito 200 para token ...${pushToken.slice(-6)}`);
+                    } else {
+                        console.error(`[APPLE_PUSH] Error ${status}. Respuesta Apple: ${data}`);
+                    }
+                    client.close();
+                });
+            });
+
+            pushReq.on('error', (err) => {
+                console.error(`[APPLE_PUSH] Error HTTP2:`, err.message);
+                client.close();
+            });
+
+            pushReq.end('{}');
         }
-    } catch (e) { console.error("Error Apple Push:", e.message); }
+    } catch (e) { console.error("Error general Apple Push:", e.message); }
     return null;
 });
 
-// ==========================================
-// 4. GOOGLE WALLET GENERATOR (RESTAURADO 100% Y CORREGIDO .exists)
-// ==========================================
+// --- GOOGLE WALLET GENERATOR ---
 export const generatewalletpass = onRequest({
     region: "us-central1",
     invoker: "public"
@@ -302,7 +338,6 @@ export const generatewalletpass = onRequest({
         if (!custSnap.exists) return res.status(404).send("Cliente no encontrado.");
 
         const business = busSnap.data();
-        // CORRECCIÓN: .exists es propiedad
         const cardSettings = cardSnap.exists ? cardSnap.data() : {};
         const customer = custSnap.data();
 
@@ -319,49 +354,48 @@ export const generatewalletpass = onRequest({
         let cardColor = cardSettings.color || "#5134f9";
         if (!cardColor.startsWith('#')) cardColor = `#${cardColor}`;
 
-        let logoObj = null;
-        if (cardSettings.logoUrl) {
-            logoObj = {
-                sourceUri: { uri: cardSettings.logoUrl },
-                contentDescription: { defaultValue: { language: "es-419", value: "LOGO" } }
-            };
-        }
-
-        const genericClass = {
-            id: classId,
-            issuerName: bizName,
-            classTemplateInfo: {
-                cardTemplateOverride: {
-                    cardRowTemplateInfos: [{
-                        twoItems: {
-                            startItem: { firstValue: { fields: [{ fieldPath: "object.textModulesData['sellos']" }] } },
-                            endItem: { firstValue: { fields: [{ fieldPath: "object.textModulesData['recompensas']" }] } }
-                        }
-                    }]
-                }
-            }
-        };
-
-        const genericObject = {
-            id: objectId,
-            classId: classId,
-            hexBackgroundColor: cardColor,
-            logo: logoObj,
-            cardTitle: { defaultValue: { language: "es-419", value: bizName } },
-            header: { defaultValue: { language: "es-419", value: custName } },
-            subheader: { defaultValue: { language: "es-419", value: "Nombre" } },
-            textModulesData: [
-                { id: "sellos", header: "Sellos acumulados", body: `${stamps}` },
-                { id: "recompensas", header: "Recompensas", body: `${rewardsAvailable}` }
-            ],
-            barcode: { type: "QR_CODE", value: cid, alternateText: cid.substring(0, 8) }
-        };
-
         const claims = {
             iss: serviceAccount.client_email,
             aud: "google",
             typ: "savetowallet",
-            payload: { genericClasses: [genericClass], genericObjects: [genericObject] },
+            payload: { 
+                genericClasses: [{
+                    id: classId,
+                    issuerName: bizName,
+                    classTemplateInfo: {
+                        cardTemplateOverride: {
+                            cardRowTemplateInfos: [{
+                                twoItems: {
+                                    startItem: { firstValue: { fields: [{ fieldPath: "object.textModulesData['sellos']" }] } },
+                                    endItem: { firstValue: { fields: [{ fieldPath: "object.textModulesData['recompensas']" }] } }
+                                }
+                            }]
+                        }
+                    }
+                }], 
+                genericObjects: [{
+                    id: objectId,
+                    classId: classId,
+                    hexBackgroundColor: cardColor,
+                    cardTitle: { defaultValue: { language: "es-419", value: bizName } },
+                    header: { defaultValue: { language: "es-419", value: custName } },
+                    // Restauramos el logo del negocio desde Storage
+                    logo: cardSettings.logoUrl ? {
+                        sourceUri: { uri: cardSettings.logoUrl },
+                        contentDescription: { defaultValue: { language: "es-419", value: "Logo" } }
+                    } : undefined,
+                    textModulesData: [
+                        { id: "sellos", header: "Sellos acumulados", body: `${stamps}` },
+                        { id: "recompensas", header: "Recompensas", body: `${rewardsAvailable}` }
+                    ],
+                    barcode: { 
+                        type: "QR_CODE", 
+                        value: cid,
+                        // Restauramos los 8 dígitos del CID bajo el QR
+                        alternateText: cid.substring(0, 8)
+                    }
+                }] 
+            },
         };
 
         const token = jwt.sign(claims, serviceAccount.private_key.replace(/\\n/g, '\n'), { algorithm: "RS256" });
