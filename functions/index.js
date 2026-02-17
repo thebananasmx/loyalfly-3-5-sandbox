@@ -99,10 +99,7 @@ export const generateapplepass = onRequest({
             logoText: (cardSettings.name || business.name || "Loyalfly").toUpperCase()
         });
 
-        // Apple Wallet requiere HTTPS y la versión v1 en la URL
-        pass.webServiceURL = "https://applewalletweb-2idcsaj5va-uc.a.run.app/v1";
-        pass.authenticationToken = cid;
-
+        // --- CONFIGURACIÓN DE CAMPOS ---
         pass.secondaryFields.push({ key: "name", label: "CLIENTE", value: customer.name || "Miembro" });
         pass.secondaryFields.push({ key: "stamps", label: "SELLOS", value: String(customer.stamps || 0) });
         pass.backFields.push({ key: "rewards", label: "PREMIOS CANJEADOS", value: String(customer.rewardsRedeemed || 0) });
@@ -115,6 +112,8 @@ export const generateapplepass = onRequest({
             altText: "Escanea, suma sellos"
         });
 
+        // --- MANEJO EXPLÍCITO DE IMÁGENES ---
+        // Se añade el logotipo también a la franja (strip.png) como fondo temporal.
         const imageAssets = [
             { 
                 url: cardSettings.logoUrl, 
@@ -135,109 +134,23 @@ export const generateapplepass = onRequest({
                         asset.names.forEach(fileName => pass.addBuffer(fileName, imageBuffer));
                     }
                 } catch (err) {
-                    console.warn(`Error cargando imagen:`, err.message);
+                    console.warn(`Error cargando imagen desde ${asset.url}:`, err.message);
                 }
             }
         }
 
         const buffer = await pass.getAsBuffer();
         res.setHeader("Content-Type", "application/vnd.apple.pkpass");
-        res.setHeader("Last-Modified", new Date().toUTCString());
+        res.setHeader("Content-Disposition", `attachment; filename=loyalfly-${cid}.pkpass`);
         return res.status(200).send(buffer);
     } catch (e) {
         console.error("Error Apple Pass:", e);
-        return res.status(500).send(`Error: ${e.message}`);
+        return res.status(500).send(`Error Apple Pass: ${e.message}`);
     }
 });
 
 // ==========================================
-// 2. APPLE WALLET WEB SERVICE (Endpoints de Apple)
-// ==========================================
-export const applewalletweb = onRequest({
-    region: "us-central1",
-    memory: "256MiB",
-    invoker: "public"
-}, async (req, res) => {
-    try {
-        const { method, path: rawPath, headers, body } = req;
-        // Normalizamos la ruta para manejar prefijos de función o dominios directos
-        const fullPath = rawPath.startsWith("/applewalletweb") ? rawPath.replace("/applewalletweb", "") : rawPath;
-        const parts = fullPath.split("/").filter(p => p !== ""); 
-        const authToken = (headers.authorization || "").replace("ApplePass ", "");
-
-        console.log(`[PASS_LOG] Request: ${method} ${fullPath}`);
-
-        // 2.1 REGISTRO: POST v1/devices/{deviceId}/registrations/{passType}/{serial}
-        if (method === "POST" && fullPath.includes("/registrations/")) {
-            const deviceId = parts[2];     
-            const serialNumber = parts[5]; 
-            const pushToken = body.pushToken;
-
-            if (!authToken || authToken !== serialNumber) return res.status(401).send();
-
-            // Buscamos al cliente por el campo 'cid' que aseguraremos que exista
-            const customersSnap = await db.collectionGroup("customers").where("cid", "==", serialNumber).get();
-            if (!customersSnap.empty) {
-                await customersSnap.docs[0].ref.collection("registrations").doc(deviceId).set({
-                    pushToken,
-                    updatedAt: admin.firestore.FieldValue.serverTimestamp()
-                });
-                console.log(`[PASS] Registrado dispositivo ${deviceId} para cliente ${serialNumber}`);
-                return res.status(200).send();
-            }
-            return res.status(404).send();
-        }
-
-        // 2.2 LISTA DE CAMBIOS: GET v1/devices/{deviceId}/registrations/{passType}
-        if (method === "GET" && parts.includes("devices") && parts.includes("registrations")) {
-            const deviceId = parts[2];
-            // Apple pregunta qué tarjetas han cambiado para este dispositivo.
-            const regsSnap = await db.collectionGroup("registrations").where(admin.firestore.FieldPath.documentId(), "==", deviceId).get();
-            
-            if (regsSnap.empty) return res.status(204).send();
-
-            const serialNumbers = regsSnap.docs.map(doc => doc.ref.parent.parent.id);
-            return res.status(200).json({
-                lastUpdated: new Date().toISOString(),
-                serialNumbers: serialNumbers
-            });
-        }
-
-        // 2.3 ENTREGA DE PASE: GET v1/passes/{passTypeIdentifier}/{serialNumber}
-        if (method === "GET" && parts.includes("passes")) {
-            const serialNumber = parts[parts.length - 1]; // El último segmento es el serial (CID)
-            if (!authToken || authToken !== serialNumber) return res.status(401).send();
-
-            const customersSnap = await db.collectionGroup("customers").where("cid", "==", serialNumber).get();
-            if (customersSnap.empty) return res.status(404).send();
-            
-            const customerDoc = customersSnap.docs[0];
-            const bid = customerDoc.ref.parent.parent.id;
-            
-            // Redirigimos a la generación del pase dinámico
-            return res.redirect(`https://generateapplepass-2idcsaj5va-uc.a.run.app?bid=${bid}&cid=${serialNumber}`);
-        }
-
-        // 2.4 ELIMINACIÓN: DELETE v1/devices/{deviceId}/registrations/{passType}/{serial}
-        if (method === "DELETE" && fullPath.includes("/registrations/")) {
-            const deviceId = parts[2];
-            const serialNumber = parts[5];
-            const customersSnap = await db.collectionGroup("customers").where("cid", "==", serialNumber).get();
-            if (!customersSnap.empty) {
-                await customersSnap.docs[0].ref.collection("registrations").doc(deviceId).delete();
-            }
-            return res.status(200).send();
-        }
-
-        res.status(404).send();
-    } catch (err) {
-        console.error("Web Service Error:", err);
-        res.status(500).send();
-    }
-});
-
-// ==========================================
-// 3. GOOGLE WALLET GENERATOR
+// 2. GOOGLE WALLET GENERATOR (JWT)
 // ==========================================
 export const generatewalletpass = onRequest({
     region: "us-central1",
@@ -247,10 +160,11 @@ export const generatewalletpass = onRequest({
 }, async (req, res) => {
     try {
         if (!serviceAccount) return res.status(500).send("Google Wallet credentials missing.");
+        
         const { bid, cid } = req.query;
         if (!bid || !cid) return res.status(400).send("Faltan bid o cid.");
 
-        const [busSnap, cardSnap, custSnap] = await Promise.all([
+        const [busMainSnap, cardSnap, custSnap] = await Promise.all([
             db.doc(`businesses/${bid}`).get(),
             db.doc(`businesses/${bid}/config/card`).get(),
             db.doc(`businesses/${bid}/customers/${cid}`).get()
@@ -258,11 +172,15 @@ export const generatewalletpass = onRequest({
 
         if (!custSnap.exists) return res.status(404).send("Cliente no encontrado.");
 
-        const business = busSnap.data();
+        const business = busMainSnap.data();
         const cardSettings = cardSnap.exists ? cardSnap.data() : {};
         const customer = custSnap.data();
 
         const bizName = (cardSettings.name || business.name || "Loyalfly").substring(0, 20);
+        const custName = (customer.name || "Cliente").substring(0, 25);
+        const stamps = customer.stamps || 0;
+        const rewardsAvailable = customer.rewardsRedeemed || 0;
+
         const safeBid = bid.replace(/[^a-zA-Z0-9]/g, '');
         const safeCid = cid.replace(/[^a-zA-Z0-9]/g, '');
         const classId = `${ISSUER_ID}.V31_${safeBid}`;
@@ -271,17 +189,40 @@ export const generatewalletpass = onRequest({
         let cardColor = cardSettings.color || "#5134f9";
         if (!cardColor.startsWith('#')) cardColor = `#${cardColor}`;
 
+        let logoObj = undefined;
+        if (cardSettings.logoUrl) {
+            logoObj = {
+                sourceUri: { uri: cardSettings.logoUrl.replace('.svg', '.png') },
+                contentDescription: { defaultValue: { language: "es-419", value: "Logo" } }
+            };
+        }
+
+        const genericClass = {
+            id: classId,
+            issuerName: bizName,
+            classTemplateInfo: {
+                cardTemplateOverride: {
+                    cardRowTemplateInfos: [{
+                        twoItems: {
+                            startItem: { firstValue: { fields: [{ fieldPath: "object.textModulesData['sellos']" }] } },
+                            endItem: { firstValue: { fields: [{ fieldPath: "object.textModulesData['recompensas']" }] } }
+                        }
+                    }]
+                }
+            }
+        };
+
         const genericObject = {
             id: objectId,
             classId: classId,
             hexBackgroundColor: cardColor,
-            logo: cardSettings.logoUrl ? { sourceUri: { uri: cardSettings.logoUrl.replace('.svg', '.png') } } : undefined,
+            logo: logoObj,
             cardTitle: { defaultValue: { language: "es-419", value: bizName } },
-            header: { defaultValue: { language: "es-419", value: (customer.name || "Cliente").substring(0, 25) } },
+            header: { defaultValue: { language: "es-419", value: custName } },
             subheader: { defaultValue: { language: "es-419", value: "Nombre" } },
             textModulesData: [
-                { id: "sellos", header: "Sellos acumulados", body: `${customer.stamps || 0}` },
-                { id: "recompensas", header: "Recompensas", body: `${customer.rewardsRedeemed || 0}` }
+                { id: "sellos", header: "Sellos acumulados", body: `${stamps}` },
+                { id: "recompensas", header: "Recompensas", body: `${rewardsAvailable}` }
             ],
             barcode: { type: "QR_CODE", value: cid, alternateText: cid.substring(0, 8) }
         };
@@ -290,10 +231,7 @@ export const generatewalletpass = onRequest({
             iss: serviceAccount.client_email,
             aud: "google",
             typ: "savetowallet",
-            payload: { 
-                genericClasses: [{ id: classId, issuerName: bizName }], 
-                genericObjects: [genericObject] 
-            },
+            payload: { genericClasses: [genericClass], genericObjects: [genericObject] },
         };
 
         const token = jwt.sign(claims, serviceAccount.private_key.replace(/\\n/g, '\n'), { algorithm: "RS256" });
@@ -305,23 +243,16 @@ export const generatewalletpass = onRequest({
 });
 
 // ==========================================
-// 4. REAL-TIME UPDATE TRIGGER (Google & Apple)
+// 3. REAL-TIME UPDATE TRIGGER (Google)
 // ==========================================
 export const updatewalletonstampchange = onDocumentUpdated({
     document: "businesses/{bid}/customers/{cid}",
     retry: true,
-    memory: "512MiB",
-    secrets: [APPLE_PASS_CERT_BASE64],
+    memory: "256MiB",
     maxInstances: 5
 }, async (event) => {
     const newData = event.data.after.data();
     const oldData = event.data.before.data();
-    
-    // Aseguramos que el campo 'cid' exista para búsquedas en applewalletweb
-    if (!newData.cid) {
-        await event.data.after.ref.update({ cid: event.params.cid });
-    }
-
     if (newData.stamps === oldData.stamps && newData.name === oldData.name && newData.rewardsRedeemed === oldData.rewardsRedeemed) return null;
 
     const { bid, cid } = event.params;
@@ -329,14 +260,14 @@ export const updatewalletonstampchange = onDocumentUpdated({
     const safeCid = cid.replace(/[^a-zA-Z0-9]/g, '');
     const objectId = `${ISSUER_ID}.OBJ_${safeBid}_${safeCid}`;
 
-    // --- 1. ACTUALIZAR GOOGLE WALLET ---
     try {
         const auth = new GoogleAuth({
             credentials: { client_email: serviceAccount.client_email, private_key: serviceAccount.private_key.replace(/\\n/g, '\n') },
             scopes: ["https://www.googleapis.com/auth/wallet_object.issuer"],
         });
         const client = await auth.getClient();
-        const gToken = (await client.getAccessToken()).token;
+        const tokenResponse = await client.getAccessToken();
+        const token = tokenResponse.token;
 
         const patchData = {
             header: { defaultValue: { language: "es-419", value: (newData.name || "Cliente").substring(0, 25) } },
@@ -348,26 +279,11 @@ export const updatewalletonstampchange = onDocumentUpdated({
 
         await fetch(`https://walletobjects.googleapis.com/walletobjects/v1/genericObject/${objectId}`, {
             method: 'PATCH',
-            headers: { Authorization: `Bearer ${gToken}`, "Content-Type": "application/json" },
+            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
             body: JSON.stringify(patchData)
         });
     } catch (error) {
-        console.error("Error Google Wallet:", error.message);
+        console.error("Error actualizando Google Wallet:", error.message);
     }
-
-    // --- 2. NOTIFICAR APPLE WALLET (PUSH) ---
-    try {
-        const regsSnap = await event.data.after.ref.collection("registrations").get();
-        if (!regsSnap.empty) {
-            for (const doc of regsSnap.docs) {
-                const { pushToken } = doc.data();
-                console.log(`[PUSH] Enviando notificación a Apple: ${pushToken}`);
-                // Aquí iría el envío físico del push vía HTTP/2
-            }
-        }
-    } catch (error) {
-        console.error("Error Apple Push:", error.message);
-    }
-    
     return null;
 });
