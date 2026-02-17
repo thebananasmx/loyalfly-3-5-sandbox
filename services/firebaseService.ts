@@ -428,6 +428,10 @@ export const createNewCustomer = async (businessId: string, data: { name: string
         rewardsRedeemed: 0,
     };
     const docRef = await addDoc(customersCol, newCustomerData);
+    
+    // Actualizamos el documento con su propio ID para que sea consultable vía collectionGroup en Apple Wallet
+    await updateDoc(docRef, { cid: docRef.id });
+
     return {
         id: docRef.id,
         ...data,
