@@ -2,6 +2,8 @@
 import React from 'react';
 import { BrowserRouter, HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { ToastProvider } from './context/ToastContext';
+import ToastContainer from './components/ToastContainer';
 
 import MainLayout from './components/MainLayout';
 import AppLayout from './components/AppLayout';
@@ -51,80 +53,83 @@ function App() {
 
   return (
     <AuthProvider>
-      <Router>
-        {/* Sandbox Floating Tag - Restored to previous style and position */}
-        <div className="fixed top-24 left-0 z-[9999] pointer-events-none">
-          <div className="bg-red-600 text-white text-[10px] font-black px-2 py-1 rounded-r-md shadow-2xl uppercase tracking-tighter border-y border-r border-red-700 animate-pulse pointer-events-auto cursor-default">
-            Sandbox
+      <ToastProvider>
+        <Router>
+          {/* Sandbox Floating Tag - Restored to previous style and position */}
+          <div className="fixed top-24 left-0 z-[9999] pointer-events-none">
+            <div className="bg-red-600 text-white text-[10px] font-black px-2 py-1 rounded-r-md shadow-2xl uppercase tracking-tighter border-y border-r border-red-700 animate-pulse pointer-events-auto cursor-default">
+              Sandbox
+            </div>
           </div>
-        </div>
 
-        <ScrollToTop />
-        <AnalyticsTracker />
-        <Routes>
-          {/* Public & Main Routes */}
-          <Route element={<MainLayout />}>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/pricing" element={<PricingPage />} />
-            <Route path="/terminos" element={<TermsPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/blog" element={<BlogPage />} />
-            <Route path="/blog/:slug" element={<BlogPostPage />} />
-            
-            <Route path="/docs" element={<DocsLayout />}>
-              <Route index element={<Navigate to="/docs/style-guide" replace />} />
-              <Route path="style-guide" element={<StyleGuidePage />} />
-              <Route path="changelog" element={<ChangelogPage />} />
-              <Route path="flujos" element={<UserFlowsPage />} />
+          <ScrollToTop />
+          <AnalyticsTracker />
+          <Routes>
+            {/* Public & Main Routes */}
+            <Route element={<MainLayout />}>
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/pricing" element={<PricingPage />} />
+              <Route path="/terminos" element={<TermsPage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/blog" element={<BlogPage />} />
+              <Route path="/blog/:slug" element={<BlogPostPage />} />
+              
+              <Route path="/docs" element={<DocsLayout />}>
+                <Route index element={<Navigate to="/docs/style-guide" replace />} />
+                <Route path="style-guide" element={<StyleGuidePage />} />
+                <Route path="changelog" element={<ChangelogPage />} />
+                <Route path="flujos" element={<UserFlowsPage />} />
+              </Route>
             </Route>
-          </Route>
-          
-          {/* Public Card & Vote Routes (no layout) */}
-          <Route path="/view/:slug" element={<PublicCardPage />} />
-          <Route path="/vote/:slug" element={<PublicVotePage />} />
-          <Route path="/scan/:slug" element={<ScanPage />} />
+            
+            {/* Public Card & Vote Routes (no layout) */}
+            <Route path="/view/:slug" element={<PublicCardPage />} />
+            <Route path="/vote/:slug" element={<PublicVotePage />} />
+            <Route path="/scan/:slug" element={<ScanPage />} />
 
-          {/* Business App Routes */}
-          <Route 
-            path="/app"
-            element={
-              <ProtectedRoute>
-                <AppLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<Navigate to="/app/dashboard" replace />} />
-            <Route path="dashboard" element={<DashboardPage />} />
-            <Route path="tarjeta" element={<CardEditorPage />} />
-            <Route path="metricas" element={<MetricasPage />} />
-            <Route path="nuevo-cliente" element={<NewCustomerPage />} />
-            <Route path="editar-cliente/:customerId" element={<EditCustomerPage />} />
-            <Route path="vote" element={<SurveyPage />} />
-            <Route path="settings" element={<AccountSettingsPage />} />
-          </Route>
+            {/* Business App Routes */}
+            <Route 
+              path="/app"
+              element={
+                <ProtectedRoute>
+                  <AppLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<Navigate to="/app/dashboard" replace />} />
+              <Route path="dashboard" element={<DashboardPage />} />
+              <Route path="tarjeta" element={<CardEditorPage />} />
+              <Route path="metricas" element={<MetricasPage />} />
+              <Route path="nuevo-cliente" element={<NewCustomerPage />} />
+              <Route path="editar-cliente/:customerId" element={<EditCustomerPage />} />
+              <Route path="vote" element={<SurveyPage />} />
+              <Route path="settings" element={<AccountSettingsPage />} />
+            </Route>
 
-          {/* Super Admin Routes */}
-          <Route path="/admin/login" element={<AdminLoginPage />} />
-          <Route 
-            path="/admin"
-            element={
-              <SuperAdminProtectedRoute>
-                <AdminLayout />
-              </SuperAdminProtectedRoute>
-            }
-          >
-            <Route index element={<Navigate to="/admin/dashboard" replace />} />
-            <Route path="dashboard" element={<AdminDashboardPage />} />
-            <Route path="business/:businessId" element={<AdminBusinessDetailPage />} />
-            <Route path="kpis" element={<AdminKpisPage />} />
-            <Route path="blog" element={<AdminBlogListPage />} />
-            <Route path="blog/nuevo" element={<AdminBlogEditorPage />} />
-            <Route path="blog/editar/:postId" element={<AdminBlogEditorPage />} />
-          </Route>
+            {/* Super Admin Routes */}
+            <Route path="/admin/login" element={<AdminLoginPage />} />
+            <Route 
+              path="/admin"
+              element={
+                <SuperAdminProtectedRoute>
+                  <AdminLayout />
+                </SuperAdminProtectedRoute>
+              }
+            >
+              <Route index element={<Navigate to="/admin/dashboard" replace />} />
+              <Route path="dashboard" element={<AdminDashboardPage />} />
+              <Route path="business/:businessId" element={<AdminBusinessDetailPage />} />
+              <Route path="kpis" element={<AdminKpisPage />} />
+              <Route path="blog" element={<AdminBlogListPage />} />
+              <Route path="blog/nuevo" element={<AdminBlogEditorPage />} />
+              <Route path="blog/editar/:postId" element={<AdminBlogEditorPage />} />
+            </Route>
 
-        </Routes>
-      </Router>
+          </Routes>
+          <ToastContainer />
+        </Router>
+      </ToastProvider>
     </AuthProvider>
   );
 }
