@@ -24,6 +24,7 @@ import {
   redeemRewardForCustomer
 } from '../services/firebaseService';
 import LanguageSelector from '../components/LanguageSelector';
+import { useToast } from '../context/ToastContext';
 import type { Business, Customer } from '../types';
 
 type ScanState = 'CHECK_PIN' | 'IDLE' | 'SCANNING' | 'DETAILS' | 'SUCCESS';
@@ -32,6 +33,7 @@ const ScanPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const { showToast } = useToast();
   
   const [state, setState] = useState<ScanState>('CHECK_PIN');
   const [business, setBusiness] = useState<Business | null>(null);
@@ -65,14 +67,56 @@ const ScanPage: React.FC = () => {
     loadBusiness();
   }, [slug, navigate]);
 
-  // Cleanup scanner on unmount
+  // QR Scanner Effect
   useEffect(() => {
+    let html5QrCode: Html5Qrcode | null = null;
+
+    if (state === 'SCANNING') {
+      const initScanner = async () => {
+        // Wait for DOM and animation
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        const element = document.getElementById(scannerContainerId);
+        if (!element) {
+          console.error("Scanner element not found");
+          setState('IDLE');
+          return;
+        }
+
+        try {
+          html5QrCode = new Html5Qrcode(scannerContainerId);
+          scannerRef.current = html5QrCode;
+          
+          await html5QrCode.start(
+            { facingMode: "environment" },
+            { 
+              fps: 10, 
+              qrbox: { width: 250, height: 250 },
+              aspectRatio: 1.0
+            },
+            async (decodedText) => {
+              await handleCustomerFound(decodedText);
+            },
+            () => {} // Ignore errors during scanning
+          );
+        } catch (err) {
+          console.error("Failed to start scanner:", err);
+          showToast(t('common.error'), 'error');
+          setState('IDLE');
+        }
+      };
+
+      initScanner();
+    }
+
     return () => {
-      if (scannerRef.current) {
-        scannerRef.current.stop().catch(console.error);
+      if (html5QrCode) {
+        if (html5QrCode.isScanning) {
+          html5QrCode.stop().catch(err => console.warn("Error stopping scanner on cleanup", err));
+        }
       }
     };
-  }, []);
+  }, [state]);
 
   const handlePinSubmit = (digit: string) => {
     if (pin.length < 4) {
@@ -92,30 +136,12 @@ const ScanPage: React.FC = () => {
     }
   };
 
-  const startScanning = async () => {
+  const startScanning = () => {
     setState('SCANNING');
-    setTimeout(async () => {
-      try {
-        const scanner = new Html5Qrcode(scannerContainerId);
-        scannerRef.current = scanner;
-        await scanner.start(
-          { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 250, height: 250 } },
-          async (decodedText) => {
-            // Assume decodedText is the customerId
-            await handleCustomerFound(decodedText);
-          },
-          undefined
-        );
-      } catch (err) {
-        console.error("Error starting scanner", err);
-        setState('IDLE');
-      }
-    }, 100);
   };
 
   const stopScanning = async () => {
-    if (scannerRef.current) {
+    if (scannerRef.current && scannerRef.current.isScanning) {
       try {
         await scannerRef.current.stop();
         scannerRef.current = null;
