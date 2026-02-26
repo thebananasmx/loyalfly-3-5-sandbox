@@ -73,12 +73,14 @@ const ScanPage: React.FC = () => {
 
     if (state === 'SCANNING') {
       const initScanner = async () => {
-        // Wait for DOM and animation
-        await new Promise(resolve => setTimeout(resolve, 300));
+        console.log("Initializing scanner...");
+        // Wait a bit longer for DOM to be ready
+        await new Promise(resolve => setTimeout(resolve, 500));
         
         const element = document.getElementById(scannerContainerId);
         if (!element) {
-          console.error("Scanner element not found");
+          console.error("Scanner element not found in DOM");
+          showToast(t('common.error'), 'error');
           setState('IDLE');
           return;
         }
@@ -87,6 +89,7 @@ const ScanPage: React.FC = () => {
           html5QrCode = new Html5Qrcode(scannerContainerId);
           scannerRef.current = html5QrCode;
           
+          console.log("Starting camera...");
           await html5QrCode.start(
             { facingMode: "environment" },
             { 
@@ -95,13 +98,20 @@ const ScanPage: React.FC = () => {
               aspectRatio: 1.0
             },
             async (decodedText) => {
+              console.log("QR Code detected:", decodedText);
               await handleCustomerFound(decodedText);
             },
-            () => {} // Ignore errors during scanning
+            (errorMessage) => {
+              // Only log real errors, not the constant "QR not found" noise
+              if (errorMessage.includes("NotFoundException")) return;
+              // console.log("Scanner warning:", errorMessage);
+            }
           );
-        } catch (err) {
+          console.log("Scanner started successfully");
+        } catch (err: any) {
           console.error("Failed to start scanner:", err);
-          showToast(t('common.error'), 'error');
+          const errorMsg = err?.message || err || "Unknown error";
+          showToast(`${t('common.error')}: ${errorMsg}`, 'error');
           setState('IDLE');
         }
       };
@@ -112,7 +122,17 @@ const ScanPage: React.FC = () => {
     return () => {
       if (html5QrCode) {
         if (html5QrCode.isScanning) {
-          html5QrCode.stop().catch(err => console.warn("Error stopping scanner on cleanup", err));
+          console.log("Stopping scanner...");
+          html5QrCode.stop()
+            .then(() => {
+              console.log("Scanner stopped");
+              html5QrCode?.clear();
+            })
+            .catch(err => console.error("Error stopping scanner:", err));
+        } else {
+          try {
+            html5QrCode.clear();
+          } catch (e) {}
         }
       }
     };
@@ -137,6 +157,7 @@ const ScanPage: React.FC = () => {
   };
 
   const startScanning = () => {
+    console.log("startScanning called, setting state to SCANNING");
     setState('SCANNING');
   };
 
@@ -144,9 +165,9 @@ const ScanPage: React.FC = () => {
     if (scannerRef.current && scannerRef.current.isScanning) {
       try {
         await scannerRef.current.stop();
-        scannerRef.current = null;
+        scannerRef.current.clear();
       } catch (err) {
-        console.error("Error stopping scanner", err);
+        console.error("Error stopping scanner manually:", err);
       }
     }
   };
@@ -272,15 +293,15 @@ const ScanPage: React.FC = () => {
   );
 
   const renderScanning = () => (
-    <div className="fixed inset-0 bg-black z-50 flex flex-col">
-      <div className="p-4 flex justify-between items-center bg-black/50 backdrop-blur-md">
+    <div className="fixed inset-0 bg-black z-[60] flex flex-col">
+      <div className="p-4 flex justify-between items-center bg-black/50 backdrop-blur-md z-10">
         <h2 className="text-white font-bold">{t('staff.scanTitle')}</h2>
         <button onClick={() => { stopScanning(); setState('IDLE'); }} className="text-white p-2">
           <X className="w-6 h-6" />
         </button>
       </div>
-      <div className="flex-grow relative flex items-center justify-center">
-        <div id={scannerContainerId} className="w-full h-full" />
+      <div className="flex-grow relative flex items-center justify-center bg-zinc-900">
+        <div id={scannerContainerId} className="w-full h-full min-h-[300px]" />
         <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
           <div className="w-64 h-64 border-2 border-white/50 rounded-3xl relative">
             <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-indigo-500 -mt-1 -ml-1 rounded-tl-lg" />
@@ -426,33 +447,13 @@ const ScanPage: React.FC = () => {
         <LanguageSelector />
       </div>
 
-      <AnimatePresence mode="wait">
-        {state === 'CHECK_PIN' && (
-          <motion.div key="pin" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            {renderPinPad()}
-          </motion.div>
-        )}
-        {state === 'IDLE' && (
-          <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            {renderIdle()}
-          </motion.div>
-        )}
-        {state === 'SCANNING' && (
-          <motion.div key="scanning" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            {renderScanning()}
-          </motion.div>
-        )}
-        {state === 'DETAILS' && (
-          <motion.div key="details" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            {renderDetails()}
-          </motion.div>
-        )}
-        {state === 'SUCCESS' && (
-          <motion.div key="success" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            {renderSuccess()}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <div className="pt-16">
+        {state === 'CHECK_PIN' && renderPinPad()}
+        {state === 'IDLE' && renderIdle()}
+        {state === 'SCANNING' && renderScanning()}
+        {state === 'DETAILS' && renderDetails()}
+        {state === 'SUCCESS' && renderSuccess()}
+      </div>
 
       {loading && (
         <div className="fixed inset-0 bg-white/50 backdrop-blur-sm z-[100] flex items-center justify-center">
