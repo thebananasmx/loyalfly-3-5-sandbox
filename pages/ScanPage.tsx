@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Html5Qrcode } from 'html5-qrcode';
-import { motion, AnimatePresence } from 'framer-motion';
 import { 
   QrCode, 
   X, 
@@ -307,11 +306,7 @@ const ScanPage: React.FC = () => {
         </div>
 
         <div className="p-6 flex-grow">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 mb-6"
-          >
+          <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 mb-6">
             <div className="flex items-center gap-4 mb-6">
               <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600">
                 <User className="w-8 h-8" />
@@ -351,7 +346,7 @@ const ScanPage: React.FC = () => {
                 {isRedeemable ? t('staff.readyToRedeem') : `${10 - customer.stamps} ${t('staff.stampsLeft')}`}
               </p>
             </div>
-          </motion.div>
+          </div>
         </div>
 
         <div className="p-6 pb-12 bg-white border-t border-gray-100">
@@ -362,28 +357,57 @@ const ScanPage: React.FC = () => {
               </span>
             </div>
             
-            <motion.div 
-              drag="x"
-              dragConstraints={{ left: 0, right: 280 }} // Approximate width minus handle
-              dragElastic={0.1}
-              onDrag={(e, info) => {
-                const progress = (info.point.x / 280) * 100;
-                setSlideProgress(progress);
-              }}
-              onDragEnd={(e, info) => {
-                if (info.offset.x > 200) {
-                  handleAction();
-                } else {
-                  setSlideProgress(0);
-                }
-              }}
+            <div 
               className={`absolute left-1 top-1 bottom-1 w-14 rounded-full flex items-center justify-center shadow-lg cursor-grab active:cursor-grabbing z-10 ${
                 isRedeemable ? 'bg-emerald-500' : 'bg-indigo-600'
               }`}
-              style={{ x: slideProgress * 2.8 }} // Simple mapping
+              style={{ 
+                transform: `translateX(${slideProgress * 2.8}px)`,
+                transition: slideProgress === 0 ? 'transform 0.2s' : 'none'
+              }}
+              onMouseDown={(e) => {
+                const startX = e.clientX;
+                const onMouseMove = (moveEvent: MouseEvent) => {
+                  const deltaX = moveEvent.clientX - startX;
+                  const progress = Math.min(Math.max(0, deltaX / 2.8), 100);
+                  setSlideProgress(progress);
+                };
+                const onMouseUp = (upEvent: MouseEvent) => {
+                  const deltaX = upEvent.clientX - startX;
+                  if (deltaX > 200) {
+                    handleAction();
+                  } else {
+                    setSlideProgress(0);
+                  }
+                  window.removeEventListener('mousemove', onMouseMove);
+                  window.removeEventListener('mouseup', onMouseUp);
+                };
+                window.addEventListener('mousemove', onMouseMove);
+                window.addEventListener('mouseup', onMouseUp);
+              }}
+              onTouchStart={(e) => {
+                const startX = e.touches[0].clientX;
+                const onTouchMove = (moveEvent: TouchEvent) => {
+                  const deltaX = moveEvent.touches[0].clientX - startX;
+                  const progress = Math.min(Math.max(0, deltaX / 2.8), 100);
+                  setSlideProgress(progress);
+                };
+                const onTouchEnd = (endEvent: TouchEvent) => {
+                  const deltaX = endEvent.changedTouches[0].clientX - startX;
+                  if (deltaX > 200) {
+                    handleAction();
+                  } else {
+                    setSlideProgress(0);
+                  }
+                  window.removeEventListener('touchmove', onTouchMove);
+                  window.removeEventListener('touchend', onTouchEnd);
+                };
+                window.addEventListener('touchmove', onTouchMove);
+                window.addEventListener('touchend', onTouchEnd);
+              }}
             >
               <ChevronRight className="text-white w-6 h-6" />
-            </motion.div>
+            </div>
             
             <div 
               className={`absolute inset-y-0 left-0 rounded-full transition-all duration-75 ${
@@ -399,13 +423,9 @@ const ScanPage: React.FC = () => {
 
   const renderSuccess = () => (
     <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-white">
-      <motion.div 
-        initial={{ scale: 0.5, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        className="mb-8 text-indigo-600"
-      >
+      <div className="mb-8 text-indigo-600">
         <CheckCircle2 className="w-32 h-32" />
-      </motion.div>
+      </div>
       <h1 className="text-3xl font-black text-gray-900 mb-2">{t('staff.success')}</h1>
       <p className="text-gray-500 mb-12">{t('common.success')}</p>
       
@@ -426,33 +446,13 @@ const ScanPage: React.FC = () => {
         <LanguageSelector />
       </div>
 
-      <AnimatePresence mode="wait">
-        {state === 'CHECK_PIN' && (
-          <motion.div key="pin" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            {renderPinPad()}
-          </motion.div>
-        )}
-        {state === 'IDLE' && (
-          <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            {renderIdle()}
-          </motion.div>
-        )}
-        {state === 'SCANNING' && (
-          <motion.div key="scanning" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            {renderScanning()}
-          </motion.div>
-        )}
-        {state === 'DETAILS' && (
-          <motion.div key="details" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            {renderDetails()}
-          </motion.div>
-        )}
-        {state === 'SUCCESS' && (
-          <motion.div key="success" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            {renderSuccess()}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <div className="pt-16">
+        {state === 'CHECK_PIN' && renderPinPad()}
+        {state === 'IDLE' && renderIdle()}
+        {state === 'SCANNING' && renderScanning()}
+        {state === 'DETAILS' && renderDetails()}
+        {state === 'SUCCESS' && renderSuccess()}
+      </div>
 
       {loading && (
         <div className="fixed inset-0 bg-white/50 backdrop-blur-sm z-[100] flex items-center justify-center">
