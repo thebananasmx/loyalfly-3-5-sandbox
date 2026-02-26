@@ -37,6 +37,7 @@ import MetricasPage from './pages/MetricasPage';
 import AdminKpisPage from './pages/AdminKpisPage';
 import AccountSettingsPage from './pages/AccountSettingsPage';
 import AdminBusinessDetailPage from './pages/AdminBusinessDetailPage';
+import ScanPage from './pages/ScanPage';
 
 function App() {
   // Use BrowserRouter for production/Vercel domains and HashRouter for all other environments
@@ -82,6 +83,7 @@ function App() {
           {/* Public Card & Vote Routes (no layout) */}
           <Route path="/view/:slug" element={<PublicCardPage />} />
           <Route path="/vote/:slug" element={<PublicVotePage />} />
+          <Route path="/scan/:slug" element={<ScanPage />} />
 
           {/* Business App Routes */}
           <Route 

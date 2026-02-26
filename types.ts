@@ -30,6 +30,7 @@ export interface Business {
   customerCount: number;
   cardSettings: any;
   surveySettings: any;
+  staffPin?: string;
 }
 
 export interface BlogPost {

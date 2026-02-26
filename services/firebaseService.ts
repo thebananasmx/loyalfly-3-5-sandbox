@@ -336,6 +336,11 @@ export const updateCardSettings = async (businessId: string, settings: { name: s
     return { success: true, settings };
 };
 
+export const updateStaffPin = async (businessId: string, pin: string) => {
+    const businessDocRef = doc(db, "businesses", businessId);
+    await updateDoc(businessDocRef, { staffPin: pin });
+};
+
 export const getCustomerByPhone = async (businessId: string, phone: string): Promise<Customer | null> => {
     const customersCol = collection(db, `businesses/${businessId}/customers`);
     const q = query(customersCol, where("phone", "==", phone));

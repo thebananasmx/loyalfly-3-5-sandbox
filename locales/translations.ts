@@ -212,6 +212,25 @@ export const es = {
     checkPoints: "Consulta tus sellos",
     consultOther: "Consultar otro número"
   },
+  staff: {
+    scanTitle: "Escáner de Staff",
+    enterPin: "Ingresa el PIN de Staff",
+    invalidPin: "PIN Inválido",
+    scanBtn: "ESCANEAR CÓDIGO QR",
+    cancelBtn: "CANCELAR",
+    idleText: "Pide al cliente su tarjeta digital para otorgar un sello",
+    customerDetails: "Detalles del Cliente",
+    stamps: "Sellos",
+    rewards: "Recompensas Canjeadas",
+    addStamp: "Desliza para Agregar Sello",
+    redeemReward: "Desliza para Canjear Premio",
+    success: "¡Éxito!",
+    nextCustomer: "SIGUIENTE CLIENTE",
+    stampsLeft: "sellos restantes para el premio",
+    readyToRedeem: "¡Listo para canjear premio!",
+    phone: "Teléfono",
+    email: "Email"
+  },
   pricing: {
     title: "Planes simples y transparentes",
     subtitle: "Elige el plan que se adapte al tamaño de tu negocio.",
@@ -460,6 +479,25 @@ export const en = {
     checkPoints: "Check your stamps",
     consultOther: "Check another number"
   },
+  staff: {
+    scanTitle: "Staff Scanner",
+    enterPin: "Enter Staff PIN",
+    invalidPin: "Invalid PIN",
+    scanBtn: "SCAN QR CODE",
+    cancelBtn: "CANCEL",
+    idleText: "Ask the customer for their digital card to award a stamp",
+    customerDetails: "Customer Details",
+    stamps: "Stamps",
+    rewards: "Rewards Redeemed",
+    addStamp: "Slide to Add Stamp",
+    redeemReward: "Slide to Redeem Reward",
+    success: "Success!",
+    nextCustomer: "NEXT CUSTOMER",
+    stampsLeft: "stamps left for next reward",
+    readyToRedeem: "Ready to redeem reward!",
+    phone: "Phone",
+    email: "Email"
+  },
   pricing: {
     title: "Simple and transparent plans",
     subtitle: "Choose the plan that fits your business size.",
@@ -707,6 +745,25 @@ export const pt = {
     registerLink: "Cadastre-se aqui",
     checkPoints: "Consulte seus selos",
     consultOther: "Consultar outro número"
+  },
+  staff: {
+    scanTitle: "Scanner de Staff",
+    enterPin: "Digite o PIN de Staff",
+    invalidPin: "PIN Inválido",
+    scanBtn: "ESCANEAR CÓDIGO QR",
+    cancelBtn: "CANCELAR",
+    idleText: "Peça ao cliente o seu cartão digital para conceder um selo",
+    customerDetails: "Detalhes do Cliente",
+    stamps: "Selos",
+    rewards: "Recompensas Resgatadas",
+    addStamp: "Deslize para Adicionar Selo",
+    redeemReward: "Deslize para Resgatar Prêmio",
+    success: "Sucesso!",
+    nextCustomer: "PRÓXIMO CLIENTE",
+    stampsLeft: "selos restantes para o prêmio",
+    readyToRedeem: "Pronto para resgatar prêmio!",
+    phone: "Telefone",
+    email: "Email"
   },
   pricing: {
     title: "Planos simples e transparentes",

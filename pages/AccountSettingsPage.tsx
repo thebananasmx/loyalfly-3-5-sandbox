@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { getBusinessData, reauthenticateAndChangePassword } from '../services/firebaseService';
+import { getBusinessData, reauthenticateAndChangePassword, updateStaffPin } from '../services/firebaseService';
 import type { Business } from '../types';
 import ErrorMessage from '../components/ErrorMessage';
 
@@ -18,6 +18,9 @@ const AccountSettingsPage: React.FC = () => {
     const [passwordErrors, setPasswordErrors] = useState<{ current?: string; new?: string; confirm?: string; form?: string }>({});
     const [isSaving, setIsSaving] = useState(false);
 
+    const [staffPin, setStaffPin] = useState('');
+    const [isSavingPin, setIsSavingPin] = useState(false);
+
     useEffect(() => {
         document.title = 'Ajustes de Cuenta | Loyalfly App';
         const fetchData = async () => {
@@ -26,6 +29,9 @@ const AccountSettingsPage: React.FC = () => {
             try {
                 const data = await getBusinessData(user.uid);
                 setBusinessData(data);
+                if (data?.staffPin) {
+                    setStaffPin(data.staffPin);
+                }
             } catch (error) {
                 console.error("Failed to fetch business data:", error);
                 showToast('No se pudieron cargar los datos de la cuenta.', 'error');
@@ -35,6 +41,27 @@ const AccountSettingsPage: React.FC = () => {
         };
         fetchData();
     }, [user, showToast]);
+
+    const handlePinChange = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (staffPin.length !== 4 || !/^\d+$/.test(staffPin)) {
+            showToast('El PIN debe ser de 4 dígitos numéricos.', 'error');
+            return;
+        }
+
+        setIsSavingPin(true);
+        try {
+            if (user) {
+                await updateStaffPin(user.uid, staffPin);
+                showToast('¡PIN de Staff actualizado!', 'success');
+            }
+        } catch (error) {
+            console.error("PIN update failed:", error);
+            showToast('No se pudo actualizar el PIN.', 'error');
+        } finally {
+            setIsSavingPin(false);
+        }
+    };
 
     const handlePasswordChange = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -98,6 +125,33 @@ const AccountSettingsPage: React.FC = () => {
                     <label htmlFor="email" className="block text-base font-medium text-gray-700">Email de Registro</label>
                     <input id="email" type="email" value={user?.email || ''} disabled className={inputClasses} />
                 </div>
+            </div>
+
+            <div className="p-6 bg-white border border-gray-200 rounded-lg space-y-6">
+                <h2 className="text-xl font-bold text-black">Acceso de Staff (Escáner)</h2>
+                <p className="text-gray-600 text-sm">Configura un PIN de 4 dígitos para que tus empleados puedan escanear QRs y otorgar sellos sin acceder a tu cuenta principal.</p>
+                <form onSubmit={handlePinChange} className="space-y-4">
+                    <div className="max-w-xs">
+                        <label htmlFor="staffPin" className="block text-base font-medium text-gray-700">PIN de 4 dígitos</label>
+                        <input 
+                            id="staffPin" 
+                            type="text" 
+                            maxLength={4}
+                            placeholder="Ej: 1234"
+                            value={staffPin} 
+                            onChange={e => setStaffPin(e.target.value.replace(/\D/g, ''))} 
+                            className={inputClasses} 
+                        />
+                    </div>
+                    <div className="flex items-center justify-between pt-2">
+                        <div className="text-sm text-indigo-600 font-medium">
+                            URL de Escaneo: <span className="select-all bg-indigo-50 px-2 py-1 rounded">loyalfly.com.mx/scan/{businessData?.slug}</span>
+                        </div>
+                        <button type="submit" disabled={isSavingPin} className="px-6 py-2 bg-black text-white font-semibold rounded-md hover:bg-gray-800 disabled:bg-gray-400">
+                            {isSavingPin ? 'Guardando...' : 'Guardar PIN'}
+                        </button>
+                    </div>
+                </form>
             </div>
 
             <div className="p-6 bg-white border border-gray-200 rounded-lg">

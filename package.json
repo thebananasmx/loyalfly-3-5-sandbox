@@ -12,15 +12,18 @@
     "deploy:full": "npm run build && firebase deploy"
   },
   "dependencies": {
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "react-router-dom": "^7.0.0",
     "firebase": "^10.12.2",
-    "qrcode": "^1.5.3",
+    "framer-motion": "^12.34.3",
     "html5-qrcode": "^2.3.8",
     "i18next": "^23.10.0",
+    "i18next-browser-languagedetector": "^7.2.0",
+    "lucide-react": "^0.575.0",
+    "motion": "^12.34.3",
+    "qrcode": "^1.5.3",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
     "react-i18next": "^14.0.5",
-    "i18next-browser-languagedetector": "^7.2.0"
+    "react-router-dom": "^7.0.0"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
