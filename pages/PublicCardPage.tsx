@@ -390,6 +390,7 @@ const PublicCardPage: React.FC = () => {
                           stampIconType={settings!.stampIconType}
                           customStampUrl={settings!.customStampUrl}
                           stampColor={settings!.stampColor}
+                          animateStamps={true}
                         />
                         <div className="mt-8 flex justify-center">
                             <div className="flex flex-col sm:flex-row items-center gap-4">

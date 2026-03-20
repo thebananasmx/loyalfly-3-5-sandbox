@@ -16,9 +16,10 @@ interface CardPreviewProps {
   stampIconType?: string;
   customStampUrl?: string;
   stampColor?: string;
+  animateStamps?: boolean;
 }
 
-const CardPreview: React.FC<CardPreviewProps> = ({ businessName, rewardText, cardColor, stamps, textColorScheme, logoUrl, customerName, customerPhone, customerId, stampIconType = 'star', customStampUrl, stampColor = '#FFC700' }) => {
+const CardPreview: React.FC<CardPreviewProps> = ({ businessName, rewardText, cardColor, stamps, textColorScheme, logoUrl, customerName, customerPhone, customerId, stampIconType = 'star', customStampUrl, stampColor = '#FFC700', animateStamps = false }) => {
   const { t } = useTranslation();
   const totalStamps = 10;
   const isRewardReady = stamps >= totalStamps;
@@ -32,11 +33,16 @@ const CardPreview: React.FC<CardPreviewProps> = ({ businessName, rewardText, car
   const unfilledStampBgColor = 'bg-white/30';
   const rewardReadyTextColor = isLight ? 'text-green-300' : 'text-green-600';
 
-  const renderStampIcon = () => {
-      const iconClass = "w-8 h-8";
-      const style = { color: stampColor || '#FFC700' };
+  const renderStampIcon = (index: number) => {
+      const animationClass = animateStamps ? "animate-fade-in" : "";
+      const iconClass = `w-8 h-8 ${animationClass}`;
+      const style = { 
+          color: stampColor || '#FFC700', 
+          animationDelay: animateStamps ? `${index * 0.1}s` : '0s'
+      };
+      
       if (stampIconType === 'custom' && customStampUrl) {
-          return <img src={customStampUrl} alt="Stamp" className="w-8 h-8 object-contain" />;
+          return <img src={customStampUrl} alt="Stamp" className={`w-8 h-8 object-contain ${animationClass}`} style={style} />;
       }
       switch (stampIconType) {
           case 'coffee': return <SolidCoffee className={iconClass} style={style} />;
@@ -82,7 +88,7 @@ const CardPreview: React.FC<CardPreviewProps> = ({ businessName, rewardText, car
                         index < stamps ? filledStampBgColor : unfilledStampBgColor
                     }`}
                 >
-                    {index < stamps && renderStampIcon()}
+                    {index < stamps && renderStampIcon(index)}
                 </div>
             ))}
         </div>
