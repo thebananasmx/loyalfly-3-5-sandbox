@@ -27,6 +27,7 @@ const CardEditorPage: React.FC = () => {
   const [textColorScheme, setTextColorScheme] = useState<'dark' | 'light'>('dark');
   const [stampIconType, setStampIconType] = useState<'star' | 'coffee' | 'kiss' | 'scissors' | 'gift' | 'custom'>('star');
   const [customStampUrl, setCustomStampUrl] = useState('');
+  const [stampColor, setStampColor] = useState('#FFC700');
   const [plan, setPlan] = useState<'Gratis' | 'Entrepreneur' | 'Pro'>('Gratis');
   const [stamps, setStamps] = useState(4);
   const [slug, setSlug] = useState('');
@@ -57,6 +58,7 @@ const CardEditorPage: React.FC = () => {
                       setLogoUrl(data.cardSettings.logoUrl || '');
                       setStampIconType(data.cardSettings.stampIconType || 'star');
                       setCustomStampUrl(data.cardSettings.customStampUrl || '');
+                      setStampColor(data.cardSettings.stampColor || '#FFC700');
                   } else {
                       setBusinessName(data.name || '');
                   }
@@ -85,7 +87,8 @@ const CardEditorPage: React.FC = () => {
             textColorScheme: textColorScheme,
             logoUrl: logoUrl,
             stampIconType: stampIconType,
-            customStampUrl: customStampUrl
+            customStampUrl: customStampUrl,
+            stampColor: stampColor
         });
         showToast(t('cardEditor.saveSuccess'), 'success');
     } catch (error) {
@@ -327,6 +330,34 @@ const CardEditorPage: React.FC = () => {
                 />
             </div>
           </div>
+          <div>
+            <label htmlFor="stampColorHex" className="block text-base font-medium text-gray-700 mb-1">
+                Color del Sello
+            </label>
+            <div className="mt-1 flex items-center gap-3">
+                <div className="relative w-12 h-10">
+                    <div 
+                        className="w-full h-full rounded-md border border-gray-300"
+                        style={{ backgroundColor: stampColor }}
+                    ></div>
+                    <input
+                        type="color"
+                        value={stampColor}
+                        onChange={(e) => setStampColor(e.target.value)}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        title="Seleccionar un color para el sello"
+                    />
+                </div>
+                <input
+                    id="stampColorHex"
+                    type="text"
+                    value={stampColor.toUpperCase()}
+                    onChange={(e) => setStampColor(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-black focus:border-black"
+                    aria-label="Código de color hexadecimal del sello"
+                />
+            </div>
+          </div>
            <div>
             <label className="block text-base font-medium text-gray-700 mb-1">
               {t('card.textColorLabel')}
@@ -357,19 +388,19 @@ const CardEditorPage: React.FC = () => {
             </label>
             <div className="mt-1 grid grid-cols-3 sm:grid-cols-6 gap-2">
                 <button onClick={() => setStampIconType('star')} className={`p-2 border rounded-md flex justify-center items-center ${stampIconType === 'star' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:bg-gray-50'}`}>
-                    <SolidStar className="w-6 h-6 text-gray-700" />
+                    <SolidStar className="w-6 h-6" style={{ color: stampColor }} />
                 </button>
                 <button onClick={() => setStampIconType('coffee')} className={`p-2 border rounded-md flex justify-center items-center ${stampIconType === 'coffee' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:bg-gray-50'}`}>
-                    <SolidCoffee className="w-6 h-6 text-gray-700" />
+                    <SolidCoffee className="w-6 h-6" style={{ color: stampColor }} />
                 </button>
                 <button onClick={() => setStampIconType('kiss')} className={`p-2 border rounded-md flex justify-center items-center ${stampIconType === 'kiss' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:bg-gray-50'}`}>
-                    <SolidHeart className="w-6 h-6 text-gray-700" />
+                    <SolidHeart className="w-6 h-6" style={{ color: stampColor }} />
                 </button>
                 <button onClick={() => setStampIconType('scissors')} className={`p-2 border rounded-md flex justify-center items-center ${stampIconType === 'scissors' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:bg-gray-50'}`}>
-                    <SolidScissors className="w-6 h-6 text-gray-700" />
+                    <SolidScissors className="w-6 h-6" style={{ color: stampColor }} />
                 </button>
                 <button onClick={() => setStampIconType('gift')} className={`p-2 border rounded-md flex justify-center items-center ${stampIconType === 'gift' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:bg-gray-50'}`}>
-                    <SolidGift className="w-6 h-6 text-gray-700" />
+                    <SolidGift className="w-6 h-6" style={{ color: stampColor }} />
                 </button>
 
                 <div className="relative group">
@@ -523,6 +554,7 @@ const CardEditorPage: React.FC = () => {
             logoUrl={logoUrl}
             stampIconType={stampIconType}
             customStampUrl={customStampUrl}
+            stampColor={stampColor}
          />
       </div>
     </div>

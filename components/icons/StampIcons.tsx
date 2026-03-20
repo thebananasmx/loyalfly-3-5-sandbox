@@ -1,27 +1,27 @@
 import React from 'react';
 
-export const SolidStar = ({ className }: { className?: string }) => (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+export const SolidStar = ({ className, style }: { className?: string, style?: React.CSSProperties }) => (
+    <svg className={className} style={style} viewBox="0 0 24 24" fill="currentColor">
         <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
     </svg>
 );
 
-export const SolidCoffee = ({ className }: { className?: string }) => (
-    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+export const SolidCoffee = ({ className, style }: { className?: string, style?: React.CSSProperties }) => (
+    <svg className={className} style={style} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path fillRule="evenodd" clipRule="evenodd" d="M3.28441 11.2661C3.15113 9.26687 3.08449 8.26726 3.67729 7.63363C4.27009 7 5.27191 7 7.27555 7H12.7245C14.7281 7 15.7299 7 16.3227 7.63363C16.4852 7.80726 16.5981 8.00837 16.6737 8.25H17C19.5261 8.25 21.75 10.0619 21.75 12.5C21.75 14.9381 19.5261 16.75 17 16.75H16.3499C16.3383 16.9226 16.3269 17.0891 16.3155 17.25H3.68451C3.66551 16.9826 3.64663 16.6993 3.62662 16.3991L3.28441 11.2661ZM16.45 15.25H17C18.8921 15.25 20.25 13.9278 20.25 12.5C20.25 11.0722 18.8921 9.75 17 9.75H16.8007C16.788 10.1801 16.7547 10.6802 16.7156 11.2661L16.45 15.25Z" fill="currentColor"/>
         <path d="M3.81902 18.75H16.181C16.0372 19.9266 15.8026 20.6671 15.2429 21.1907C14.3779 22 13.0475 22 10.3867 22H9.61333C6.95253 22 5.62212 22 4.75712 21.1907C4.19745 20.6671 3.96285 19.9266 3.81902 18.75Z" fill="currentColor"/>
         <path fillRule="evenodd" clipRule="evenodd" d="M6.97721 1.32673C7.31443 1.56726 7.39281 2.03562 7.15227 2.37284L6.7662 2.91409C7.39202 3.38836 7.53073 4.27761 7.07175 4.92108L6.66113 5.49675C6.42059 5.83396 5.95223 5.91234 5.61501 5.67181C5.2778 5.43127 5.19942 4.96291 5.43996 4.62569L5.82603 4.08444C5.2002 3.61018 5.0615 2.72092 5.52048 2.07745L5.9311 1.50179C6.17163 1.16457 6.63999 1.08619 6.97721 1.32673ZM10.9772 1.32673C11.3144 1.56726 11.3928 2.03562 11.1523 2.37284L10.7662 2.91409C11.392 3.38836 11.5307 4.27761 11.0717 4.92108L10.6611 5.49675C10.4206 5.83396 9.95223 5.91234 9.61501 5.67181C9.2778 5.43127 9.19942 4.96291 9.43996 4.62569L9.82603 4.08444C9.2002 3.61018 9.0615 2.72092 9.52048 2.07745L9.9311 1.50179C10.1716 1.16457 10.64 1.08619 10.9772 1.32673ZM14.9772 1.32673C15.3144 1.56726 15.3928 2.03562 15.1523 2.37284L14.7662 2.91409C15.392 3.38836 15.5307 4.27761 15.0717 4.92108L14.6611 5.49675C14.4206 5.83396 13.9522 5.91234 13.615 5.67181C13.2778 5.43127 13.1994 4.96291 13.44 4.62569L13.826 4.08444C13.2002 3.61018 13.0615 2.72092 13.5205 2.07745L13.9311 1.50179C14.1716 1.16457 14.64 1.08619 14.9772 1.32673Z" fill="currentColor"/>
     </svg>
 );
 
-export const SolidHeart = ({ className }: { className?: string }) => (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+export const SolidHeart = ({ className, style }: { className?: string, style?: React.CSSProperties }) => (
+    <svg className={className} style={style} viewBox="0 0 24 24" fill="currentColor">
         <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
     </svg>
 );
 
-export const SolidScissors = ({ className }: { className?: string }) => (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+export const SolidScissors = ({ className, style }: { className?: string, style?: React.CSSProperties }) => (
+    <svg className={className} style={style} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
         <g>
             <path fill="none" d="M0 0h24v24H0z"/>
             <path d="M9.683 7.562L12 9.88l6.374-6.375a2 2 0 0 1 2.829 0l.707.707L9.683 16.438a4 4 0 1 1-2.121-2.121L9.88 12 7.562 9.683a4 4 0 1 1 2.121-2.121zM6 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm9.535-6.587l6.375 6.376-.707.707a2 2 0 0 1-2.829 0l-4.96-4.961 2.12-2.122z"/>
@@ -29,8 +29,8 @@ export const SolidScissors = ({ className }: { className?: string }) => (
     </svg>
 );
 
-export const SolidGift = ({ className }: { className?: string }) => (
-    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+export const SolidGift = ({ className, style }: { className?: string, style?: React.CSSProperties }) => (
+    <svg className={className} style={style} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M11.2498 2C7.03145 2.00411 4.84888 2.07958 3.46423 3.46423C2.07958 4.84888 2.00411 7.03145 2 11.2498H6.91352C6.56255 10.8114 6.30031 10.2943 6.15731 9.72228C5.61906 7.56926 7.56926 5.61906 9.72228 6.15731C10.2943 6.30031 10.8114 6.56255 11.2498 6.91352V2Z" fill="currentColor"/>
         <path d="M2 12.7498C2.00411 16.9681 2.07958 19.1506 3.46423 20.5353C4.84888 21.9199 7.03145 21.9954 11.2498 21.9995V14.1234C10.4701 15.6807 8.8598 16.7498 6.99976 16.7498C6.58555 16.7498 6.24976 16.414 6.24976 15.9998C6.24976 15.5856 6.58555 15.2498 6.99976 15.2498C8.53655 15.2498 9.82422 14.1831 10.1628 12.7498H2Z" fill="currentColor"/>
         <path d="M12.7498 21.9995C16.9681 21.9954 19.1506 21.9199 20.5353 20.5353C21.9199 19.1506 21.9954 16.9681 21.9995 12.7498H13.8367C14.1753 14.1831 15.463 15.2498 16.9998 15.2498C17.414 15.2498 17.7498 15.5856 17.7498 15.9998C17.7498 16.414 17.414 16.7498 16.9998 16.7498C15.1397 16.7498 13.5294 15.6807 12.7498 14.1234V21.9995Z" fill="currentColor"/>

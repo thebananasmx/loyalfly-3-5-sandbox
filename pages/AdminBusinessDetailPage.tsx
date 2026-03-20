@@ -97,6 +97,7 @@ const AdminBusinessDetailPage: React.FC = () => {
                                 customerId={previewCustomer?.id}
                                 stampIconType={cardSettings.stampIconType}
                                 customStampUrl={cardSettings.customStampUrl}
+                                stampColor={cardSettings.stampColor}
                             />
                         </div>
                     </div>

@@ -23,6 +23,7 @@ interface CardSettings {
     plan?: string;
     stampIconType?: string;
     customStampUrl?: string;
+    stampColor?: string;
 }
 
 interface SurveySettings {
@@ -388,6 +389,7 @@ const PublicCardPage: React.FC = () => {
                           customerId={customer?.id}
                           stampIconType={settings!.stampIconType}
                           customStampUrl={settings!.customStampUrl}
+                          stampColor={settings!.stampColor}
                         />
                         <div className="mt-8 flex justify-center">
                             <div className="flex flex-col sm:flex-row items-center gap-4">

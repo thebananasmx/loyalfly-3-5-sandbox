@@ -15,9 +15,10 @@ interface CardPreviewProps {
   customerId?: string;
   stampIconType?: string;
   customStampUrl?: string;
+  stampColor?: string;
 }
 
-const CardPreview: React.FC<CardPreviewProps> = ({ businessName, rewardText, cardColor, stamps, textColorScheme, logoUrl, customerName, customerPhone, customerId, stampIconType = 'star', customStampUrl }) => {
+const CardPreview: React.FC<CardPreviewProps> = ({ businessName, rewardText, cardColor, stamps, textColorScheme, logoUrl, customerName, customerPhone, customerId, stampIconType = 'star', customStampUrl, stampColor = '#FFC700' }) => {
   const { t } = useTranslation();
   const totalStamps = 10;
   const isRewardReady = stamps >= totalStamps;
@@ -32,18 +33,19 @@ const CardPreview: React.FC<CardPreviewProps> = ({ businessName, rewardText, car
   const rewardReadyTextColor = isLight ? 'text-green-300' : 'text-green-600';
 
   const renderStampIcon = () => {
-      const iconClass = "w-8 h-8 text-[#FFC700]";
+      const iconClass = "w-8 h-8";
+      const style = { color: stampColor || '#FFC700' };
       if (stampIconType === 'custom' && customStampUrl) {
           return <img src={customStampUrl} alt="Stamp" className="w-8 h-8 object-contain" />;
       }
       switch (stampIconType) {
-          case 'coffee': return <SolidCoffee className={iconClass} />;
-          case 'kiss': return <SolidHeart className={iconClass} />;
-          case 'scissors': return <SolidScissors className={iconClass} />;
-          case 'gift': return <SolidGift className={iconClass} />;
+          case 'coffee': return <SolidCoffee className={iconClass} style={style} />;
+          case 'kiss': return <SolidHeart className={iconClass} style={style} />;
+          case 'scissors': return <SolidScissors className={iconClass} style={style} />;
+          case 'gift': return <SolidGift className={iconClass} style={style} />;
           case 'star':
           default:
-              return <SolidStar className={iconClass} />;
+              return <SolidStar className={iconClass} style={style} />;
       }
   };
 

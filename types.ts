@@ -36,6 +36,7 @@ export interface Business {
     logoUrl?: string;
     stampIconType?: 'star' | 'coffee' | 'kiss' | 'scissors' | 'gift' | 'custom';
     customStampUrl?: string;
+    stampColor?: string;
   };
   surveySettings: any;
   staffPin?: string;

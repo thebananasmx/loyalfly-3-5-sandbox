@@ -152,6 +152,7 @@ const StyleGuidePage: React.FC = () => {
                   cardColor="#FFFFFF"
                   stamps={3}
                   textColorScheme="dark"
+                  stampColor="#FFC700"
                />
           </div>
       </section>
