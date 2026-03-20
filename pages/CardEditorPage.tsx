@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import CardPreview from '../components/CardPreview';
 import { useAuth } from '../context/AuthContext';
-import { updateCardSettings, getBusinessData, uploadBusinessLogo, deleteBusinessLogoFile } from '../services/firebaseService';
+import { updateCardSettings, getBusinessData, uploadBusinessLogo, deleteBusinessLogoFile, uploadCustomStamp, deleteCustomStampFile } from '../services/firebaseService';
+import { SolidStar, SolidCoffee, SolidHeart, SolidScissors, SolidGift } from '../components/icons/StampIcons';
 import { useToast } from '../context/ToastContext';
 import { useTranslation } from 'react-i18next';
 
@@ -24,14 +25,19 @@ const CardEditorPage: React.FC = () => {
   const [logoUrl, setLogoUrl] = useState('');
   const [cardColor, setCardColor] = useState('#FEF3C7');
   const [textColorScheme, setTextColorScheme] = useState<'dark' | 'light'>('dark');
+  const [stampIconType, setStampIconType] = useState<'star' | 'coffee' | 'kiss' | 'scissors' | 'gift' | 'custom'>('star');
+  const [customStampUrl, setCustomStampUrl] = useState('');
+  const [plan, setPlan] = useState<'Gratis' | 'Entrepreneur' | 'Pro'>('Gratis');
   const [stamps, setStamps] = useState(4);
   const [slug, setSlug] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [isUploadingStamp, setIsUploadingStamp] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const stampInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
       document.title = 'Editor de Tarjeta | Loyalfly App';
@@ -42,12 +48,15 @@ const CardEditorPage: React.FC = () => {
               const data: any = await getBusinessData(user.uid);
               if (data) {
                   setSlug(data.slug || '');
+                  setPlan(data.plan || 'Gratis');
                   if (data.cardSettings) {
                       setBusinessName(data.cardSettings.name || '');
                       setRewardText(data.cardSettings.reward || '');
                       setCardColor(data.cardSettings.color || '#FEF3C7');
                       setTextColorScheme(data.cardSettings.textColorScheme || 'dark');
                       setLogoUrl(data.cardSettings.logoUrl || '');
+                      setStampIconType(data.cardSettings.stampIconType || 'star');
+                      setCustomStampUrl(data.cardSettings.customStampUrl || '');
                   } else {
                       setBusinessName(data.name || '');
                   }
@@ -74,7 +83,9 @@ const CardEditorPage: React.FC = () => {
             reward: rewardText,
             color: cardColor,
             textColorScheme: textColorScheme,
-            logoUrl: logoUrl
+            logoUrl: logoUrl,
+            stampIconType: stampIconType,
+            customStampUrl: customStampUrl
         });
         showToast(t('cardEditor.saveSuccess'), 'success');
     } catch (error) {
@@ -112,6 +123,33 @@ const CardEditorPage: React.FC = () => {
       }
   };
 
+  const handleStampFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file || !user) return;
+
+      if (!file.type.startsWith('image/')) {
+          showToast('Por favor selecciona una imagen válida.', 'error');
+          return;
+      }
+      if (file.size > 1 * 1024 * 1024) { // 1MB limit for stamp
+          showToast('La imagen es demasiado grande. El límite es 1MB.', 'error');
+          return;
+      }
+
+      setIsUploadingStamp(true);
+      try {
+          const downloadUrl = await uploadCustomStamp(user.uid, file);
+          setCustomStampUrl(downloadUrl);
+          setStampIconType('custom');
+          showToast('Sello personalizado subido correctamente.', 'success');
+      } catch (error) {
+          console.error("Upload error", error);
+          showToast('Error al subir el sello.', 'error');
+      } finally {
+          setIsUploadingStamp(false);
+      }
+  };
+
   const handleDeleteLogo = async () => {
       if (!user) return;
       
@@ -119,7 +157,6 @@ const CardEditorPage: React.FC = () => {
       if (!confirmDelete) return;
 
       try {
-          // If the URL contains our storage bucket, try to delete the file
           if (logoUrl.includes('firebasestorage')) {
               await deleteBusinessLogoFile(user.uid);
           }
@@ -127,6 +164,24 @@ const CardEditorPage: React.FC = () => {
           showToast('Logo eliminado del editor. No olvides guardar los cambios.', 'success');
       } catch (error) {
           showToast('Error al eliminar el logo.', 'error');
+      }
+  };
+
+  const handleDeleteStamp = async () => {
+      if (!user) return;
+      
+      const confirmDelete = window.confirm("¿Estás seguro de que quieres eliminar el sello personalizado?");
+      if (!confirmDelete) return;
+
+      try {
+          if (customStampUrl.includes('firebasestorage')) {
+              await deleteCustomStampFile(user.uid);
+          }
+          setCustomStampUrl('');
+          setStampIconType('star');
+          showToast('Sello eliminado del editor. No olvides guardar los cambios.', 'success');
+      } catch (error) {
+          showToast('Error al eliminar el sello.', 'error');
       }
   };
 
@@ -295,6 +350,99 @@ const CardEditorPage: React.FC = () => {
                 </button>
             </div>
           </div>
+
+          <div>
+            <label className="block text-base font-medium text-gray-700 mb-1">
+              Icono del Sello
+            </label>
+            <div className="mt-1 grid grid-cols-3 sm:grid-cols-6 gap-2">
+                <button onClick={() => setStampIconType('star')} className={`p-2 border rounded-md flex justify-center items-center ${stampIconType === 'star' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                    <SolidStar className="w-6 h-6 text-gray-700" />
+                </button>
+                <button onClick={() => setStampIconType('coffee')} className={`p-2 border rounded-md flex justify-center items-center ${stampIconType === 'coffee' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                    <SolidCoffee className="w-6 h-6 text-gray-700" />
+                </button>
+                <button onClick={() => setStampIconType('kiss')} className={`p-2 border rounded-md flex justify-center items-center ${stampIconType === 'kiss' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                    <SolidHeart className="w-6 h-6 text-gray-700" />
+                </button>
+                <button onClick={() => setStampIconType('scissors')} className={`p-2 border rounded-md flex justify-center items-center ${stampIconType === 'scissors' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                    <SolidScissors className="w-6 h-6 text-gray-700" />
+                </button>
+                <button onClick={() => setStampIconType('gift')} className={`p-2 border rounded-md flex justify-center items-center ${stampIconType === 'gift' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                    <SolidGift className="w-6 h-6 text-gray-700" />
+                </button>
+
+                <div className="relative group">
+                    <button 
+                        onClick={() => {
+                            // if (plan === 'Gratis') return; // Skipped for testing
+                            setStampIconType('custom');
+                        }} 
+                        className={`w-full h-full p-2 border rounded-md flex justify-center items-center ${stampIconType === 'custom' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:bg-gray-50'}`}
+                    >
+                        <span className="text-xs font-bold text-gray-700">Custom</span>
+                        <div className="absolute -top-2 -right-2 bg-yellow-400 text-xs rounded-full w-5 h-5 flex items-center justify-center shadow-sm">👑</div>
+                    </button>
+                    {plan === 'Gratis' && (
+                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-48 p-2 bg-gray-900 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
+                            Sube tu propio logo o diseño de sello. Disponible en el plan Entrepreneur. <span className="text-indigo-300 font-bold">Mejorar Plan</span>
+                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {stampIconType === 'custom' && (
+                <div className="mt-4 p-4 border border-indigo-100 bg-indigo-50 rounded-md">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Sube tu sello personalizado (PNG con fondo transparente)
+                    </label>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                        <button
+                            type="button"
+                            onClick={() => stampInputRef.current?.click()}
+                            disabled={isUploadingStamp}
+                            className="inline-flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors disabled:opacity-50"
+                        >
+                            {isUploadingStamp ? (
+                                <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-200 border-t-black"></div>
+                            ) : (
+                                <UploadIcon />
+                            )}
+                            Subir Sello
+                        </button>
+                        
+                        {customStampUrl && (
+                            <button
+                                type="button"
+                                onClick={handleDeleteStamp}
+                                className="inline-flex items-center justify-center gap-2 px-4 py-2 border border-red-200 rounded-md shadow-sm text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
+                            >
+                                <TrashIcon />
+                                Borrar Sello
+                            </button>
+                        )}
+                    </div>
+                    
+                    <input 
+                        type="file" 
+                        ref={stampInputRef} 
+                        onChange={handleStampFileChange} 
+                        accept="image/png" 
+                        className="hidden" 
+                    />
+
+                    {customStampUrl && (
+                        <div className="mt-3">
+                            <p className="text-xs text-gray-500 mb-1">Vista previa:</p>
+                            <div className="w-12 h-12 border border-gray-200 rounded bg-white flex items-center justify-center p-1">
+                                <img src={customStampUrl} alt="Custom Stamp" className="max-w-full max-h-full object-contain" />
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+          </div>
            <div>
             <label htmlFor="stamps" className="block text-base font-medium text-gray-700 mb-1">
               {t('card.sampleStamps')} ({stamps})
@@ -373,6 +521,8 @@ const CardEditorPage: React.FC = () => {
             stamps={stamps}
             textColorScheme={textColorScheme}
             logoUrl={logoUrl}
+            stampIconType={stampIconType}
+            customStampUrl={customStampUrl}
          />
       </div>
     </div>

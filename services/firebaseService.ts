@@ -490,6 +490,21 @@ export const deleteBusinessLogoFile = async (businessId: string): Promise<void> 
     }
 };
 
+export const uploadCustomStamp = async (businessId: string, file: File): Promise<string> => {
+    const storageRef = ref(storage, `businesses/${businessId}/custom_stamp`);
+    await uploadBytes(storageRef, file);
+    return getDownloadURL(storageRef);
+};
+
+export const deleteCustomStampFile = async (businessId: string): Promise<void> => {
+    try {
+        const storageRef = ref(storage, `businesses/${businessId}/custom_stamp`);
+        await deleteObject(storageRef);
+    } catch (error) {
+        console.warn("Storage custom stamp file not found or already deleted.");
+    }
+};
+
 // --- SUPER ADMIN AUTH & HELPERS ---
 
 export const isSuperAdmin = async (userId: string): Promise<boolean> => {

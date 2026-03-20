@@ -95,6 +95,8 @@ const AdminBusinessDetailPage: React.FC = () => {
                                 customerName={previewCustomer?.name || 'Juan Pérez'}
                                 customerPhone={previewCustomer?.phone || '5512345678'}
                                 customerId={previewCustomer?.id}
+                                stampIconType={cardSettings.stampIconType}
+                                customStampUrl={cardSettings.customStampUrl}
                             />
                         </div>
                     </div>

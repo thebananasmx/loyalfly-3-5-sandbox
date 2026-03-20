@@ -1,6 +1,7 @@
 import React from 'react';
 import QRCode from './QRCode';
 import { useTranslation } from 'react-i18next';
+import { SolidStar, SolidCoffee, SolidHeart, SolidScissors, SolidGift } from './icons/StampIcons';
 
 interface CardPreviewProps {
   businessName: string;
@@ -12,16 +13,11 @@ interface CardPreviewProps {
   customerName?: string;
   customerPhone?: string;
   customerId?: string;
+  stampIconType?: string;
+  customStampUrl?: string;
 }
 
-// Increased size of the star icon itself
-const StarIcon: React.FC = () => (
-    <svg className="w-8 h-8 text-[#FFC700]" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
-    </svg>
-);
-
-const CardPreview: React.FC<CardPreviewProps> = ({ businessName, rewardText, cardColor, stamps, textColorScheme, logoUrl, customerName, customerPhone, customerId }) => {
+const CardPreview: React.FC<CardPreviewProps> = ({ businessName, rewardText, cardColor, stamps, textColorScheme, logoUrl, customerName, customerPhone, customerId, stampIconType = 'star', customStampUrl }) => {
   const { t } = useTranslation();
   const totalStamps = 10;
   const isRewardReady = stamps >= totalStamps;
@@ -34,6 +30,22 @@ const CardPreview: React.FC<CardPreviewProps> = ({ businessName, rewardText, car
   const filledStampBgColor = isLight ? 'bg-white' : 'bg-black';
   const unfilledStampBgColor = 'bg-white/30';
   const rewardReadyTextColor = isLight ? 'text-green-300' : 'text-green-600';
+
+  const renderStampIcon = () => {
+      const iconClass = "w-8 h-8 text-[#FFC700]";
+      if (stampIconType === 'custom' && customStampUrl) {
+          return <img src={customStampUrl} alt="Stamp" className="w-8 h-8 object-contain" />;
+      }
+      switch (stampIconType) {
+          case 'coffee': return <SolidCoffee className={iconClass} />;
+          case 'kiss': return <SolidHeart className={iconClass} />;
+          case 'scissors': return <SolidScissors className={iconClass} />;
+          case 'gift': return <SolidGift className={iconClass} />;
+          case 'star':
+          default:
+              return <SolidStar className={iconClass} />;
+      }
+  };
 
   return (
     // Single container for the entire card, with rounded corners and shadow.
@@ -68,7 +80,7 @@ const CardPreview: React.FC<CardPreviewProps> = ({ businessName, rewardText, car
                         index < stamps ? filledStampBgColor : unfilledStampBgColor
                     }`}
                 >
-                    {index < stamps && <StarIcon />}
+                    {index < stamps && renderStampIcon()}
                 </div>
             ))}
         </div>
